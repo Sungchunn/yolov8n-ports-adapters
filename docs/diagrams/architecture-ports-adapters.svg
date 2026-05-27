@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="11in" height="8.5in" viewBox="0 0 1320 1020" role="img" aria-labelledby="title desc">
+  <title id="title">Ports and adapters hexagonal view for the vision inference API</title>
+  <desc id="desc">A printable landscape hexagonal architecture diagram. HTTP and React drive the FastAPI entrypoint on the left. The application core owns the service layer, domain model, and inference port. YOLO, ONNX, and Triton style inference engines implement the port on the right.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#263238"/>
+    </marker>
+    <marker id="dash-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#59636a"/>
+    </marker>
+    <style>
+      .title { font: 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; fill: #202427; }
+      .subtitle { font: 17px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #46515a; }
+      .section { font: 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; fill: #263238; }
+      .label { font: 17px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 650; fill: #263238; }
+      .small { font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #46515a; }
+      .tiny { font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #59636a; }
+      .hex { fill: #fff8ce; stroke: #263238; stroke-width: 3; }
+      .adapter-area { fill: #f7f8fa; stroke: #d1d6da; stroke-width: 1.5; }
+      .driver { fill: #dff4e7; stroke: #263238; stroke-width: 2; }
+      .entry { fill: #e8eef5; stroke: #263238; stroke-width: 2; }
+      .core { fill: #fffefa; stroke: #263238; stroke-width: 2; }
+      .port { fill: #fff1b8; stroke: #263238; stroke-width: 2; stroke-dasharray: 8 6; }
+      .adapter { fill: #edf1f5; stroke: #263238; stroke-width: 2; }
+      .future { fill: #f4f6f8; stroke: #59636a; stroke-width: 2; stroke-dasharray: 7 5; }
+      .storage { fill: #ffffff; stroke: #263238; stroke-width: 2; }
+      .line { fill: none; stroke: #263238; stroke-width: 2.6; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #59636a; stroke-width: 2.6; stroke-dasharray: 8 7; marker-end: url(#dash-arrow); }
+      .note { fill: #ffffff; stroke: #d6dade; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1320" height="1020" fill="#ffffff"/>
+  <text x="660" y="58" text-anchor="middle" class="title">Ports and Adapters View</text>
+  <text x="660" y="88" text-anchor="middle" class="subtitle">The application core owns the use case, domain model, and inference port; adapters live outside.</text>
+
+  <rect x="55" y="145" width="285" height="735" rx="14" class="adapter-area"/>
+  <rect x="980" y="145" width="285" height="735" rx="14" class="adapter-area"/>
+  <text x="198" y="182" text-anchor="middle" class="section">Driving side</text>
+  <text x="1122" y="182" text-anchor="middle" class="section">Driven side</text>
+
+  <polygon points="660,150 900,285 900,640 660,790 420,640 420,285" class="hex"/>
+  <text x="660" y="205" text-anchor="middle" class="section">Application Core</text>
+  <text x="660" y="232" text-anchor="middle" class="small">framework-free, model-free, testable with fakes</text>
+
+  <rect x="108" y="280" width="180" height="90" rx="10" class="driver"/>
+  <text x="198" y="312" text-anchor="middle" class="label">HTTP client</text>
+  <text x="198" y="337" text-anchor="middle" class="small">curl, browser,</text>
+  <text x="198" y="357" text-anchor="middle" class="small">React UI</text>
+
+  <rect x="108" y="520" width="180" height="90" rx="10" class="future"/>
+  <text x="198" y="552" text-anchor="middle" class="label">Future drivers</text>
+  <text x="198" y="577" text-anchor="middle" class="small">CLI, gRPC, queue</text>
+  <text x="198" y="597" text-anchor="middle" class="tiny">same core</text>
+
+  <rect x="384" y="315" width="180" height="112" rx="10" class="entry"/>
+  <text x="474" y="346" text-anchor="middle" class="label">FastAPI adapter</text>
+  <text x="474" y="372" text-anchor="middle" class="small">routes, edge validation,</text>
+  <text x="474" y="392" text-anchor="middle" class="small">DTO serialization</text>
+  <text x="474" y="414" text-anchor="middle" class="tiny">entrypoints/</text>
+
+  <rect x="570" y="315" width="180" height="112" rx="10" class="core"/>
+  <text x="660" y="346" text-anchor="middle" class="label">Service layer</text>
+  <text x="660" y="372" text-anchor="middle" class="small">detect_objects()</text>
+  <text x="660" y="392" text-anchor="middle" class="small">flow control</text>
+  <text x="660" y="414" text-anchor="middle" class="tiny">service_layer/services.py</text>
+
+  <rect x="570" y="520" width="180" height="112" rx="10" class="core"/>
+  <text x="660" y="551" text-anchor="middle" class="label">Domain model</text>
+  <text x="660" y="577" text-anchor="middle" class="small">InferenceResult</text>
+  <text x="660" y="597" text-anchor="middle" class="small">Detection, BoundingBox</text>
+  <text x="660" y="619" text-anchor="middle" class="tiny">domain/model.py</text>
+
+  <rect x="756" y="315" width="180" height="112" rx="10" class="port"/>
+  <text x="846" y="346" text-anchor="middle" class="label">Inference port</text>
+  <text x="846" y="372" text-anchor="middle" class="small">AbstractInferenceEngine</text>
+  <text x="846" y="392" text-anchor="middle" class="small">predict(bytes)</text>
+  <text x="846" y="414" text-anchor="middle" class="tiny">service_layer/ports.py</text>
+
+  <rect x="1032" y="270" width="180" height="96" rx="10" class="adapter"/>
+  <text x="1122" y="302" text-anchor="middle" class="label">YOLO adapter</text>
+  <text x="1122" y="327" text-anchor="middle" class="small">YoloInferenceEngine</text>
+  <text x="1122" y="347" text-anchor="middle" class="tiny">adapters/inference.py</text>
+
+  <rect x="1032" y="425" width="180" height="86" rx="10" class="future"/>
+  <text x="1122" y="457" text-anchor="middle" class="label">ONNX adapter</text>
+  <text x="1122" y="482" text-anchor="middle" class="small">future engine</text>
+
+  <rect x="1032" y="560" width="180" height="86" rx="10" class="future"/>
+  <text x="1122" y="592" text-anchor="middle" class="label">Triton/gRPC</text>
+  <text x="1122" y="617" text-anchor="middle" class="small">future remote engine</text>
+
+  <rect x="1036" y="720" width="172" height="74" rx="10" class="storage"/>
+  <text x="1122" y="750" text-anchor="middle" class="label">Model weights</text>
+  <text x="1122" y="775" text-anchor="middle" class="small">models/yolov8n.pt</text>
+
+  <path d="M288 325 L384 360" class="line"/>
+  <path d="M288 565 C335 560 358 470 386 410" class="dash"/>
+  <path d="M564 371 L570 371" class="line"/>
+  <path d="M660 427 L660 520" class="line"/>
+  <path d="M750 371 L756 371" class="line"/>
+  <path d="M1032 318 L936 360" class="dash"/>
+  <path d="M1032 468 L936 378" class="dash"/>
+  <path d="M1032 603 L936 396" class="dash"/>
+  <path d="M1122 366 L1122 720" class="line"/>
+
+  <text x="334" y="321" text-anchor="middle" class="tiny">drives</text>
+  <text x="595" y="350" text-anchor="middle" class="tiny">calls</text>
+  <text x="782" y="350" text-anchor="middle" class="tiny">uses</text>
+  <text x="972" y="318" text-anchor="middle" class="tiny">implements</text>
+  <text x="1175" y="690" text-anchor="middle" class="tiny">loads</text>
+
+  <rect x="425" y="820" width="470" height="90" rx="10" class="note"/>
+  <text x="660" y="850" text-anchor="middle" class="label">Swap rule</text>
+  <text x="660" y="875" text-anchor="middle" class="small">Changing YOLO to ONNX or Triton changes composition and adapters only.</text>
+  <text x="660" y="895" text-anchor="middle" class="small">The service layer and domain model remain untouched.</text>
+
+  <text x="660" y="970" text-anchor="middle" class="small">Print tip: this SVG is 11 x 8.5 inches and is intended for landscape, fit-to-page PDF export.</text>
+</svg>

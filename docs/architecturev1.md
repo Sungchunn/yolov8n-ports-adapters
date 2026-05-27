@@ -1,22 +1,16 @@
 # Architecture v1 - Scaffolding Blueprint
 
-> Status: implementation blueprint.
-> Scope: how I would scaffold the assignment from `README.md` into a clean Python
-> Ports and Adapters / Onion Architecture service.
-> Key correction from review: the inference port lives in the application core,
-> not in the concrete YOLO adapter module.
+> **Status:** implementation blueprint.
+> **Scope:** how I would scaffold the assignment from `README.md` into a clean Python Ports and Adapters / Onion Architecture service.
+> **Key correction from review:** the inference port lives in the application core, not in the concrete YOLO adapter module.
 
-This version is written as the construction plan I would follow before creating
-the first production module. It keeps the dependency rule visible, defines the
-file boundaries, and makes the test seam explicit enough that route tests do not
-need to load the real YOLO model.
+This version is written as the construction plan I would follow before creating the first production module. It keeps the dependency rule visible, defines the file boundaries, and makes the test seam explicit enough that route tests do not need to load the real YOLO model.
 
 ## 1. Architecture Shape
 
-![Architecture v1 inner and outer layers](diagrams/architecturev1-inner-outer.svg)
+![Architecture v1 inner and outer layers|1210](diagrams/architecturev1-inner-outer.svg)
 
-The service has one use case: accept a JPEG, run inference through an abstract
-engine, and return structured detection metadata. The HTTP framework and the ML
+The service has one use case: accept a JPEG, run inference through an abstract engine, and return structured detection metadata. The HTTP framework and the ML
 runtime are both outside the core.
 
 | Layer | Package | Owns | Must not import |
@@ -33,9 +27,7 @@ entrypoints -> service_layer -> domain
 adapters    -> service_layer.ports + domain
 ```
 
-The inverse must never happen. In particular, the service layer imports
-`AbstractInferenceEngine` from `service_layer/ports.py`, not from
-`adapters/inference.py`.
+The inverse must never happen. In particular, the service layer imports `AbstractInferenceEngine` from `service_layer/ports.py`, not from `adapters/inference.py`.
 
 ## 2. Target Scaffold
 
@@ -89,12 +81,10 @@ The inverse must never happen. In particular, the service layer imports
 
 ## 3. Construction Order
 
-![Scaffolding construction sequence](diagrams/architecturev1-scaffold-sequence.svg)
+![Scaffolding construction sequence|1269](diagrams/architecturev1-scaffold-sequence.svg)
 
-1. Create the project shell: `pyproject.toml`, `src/` layout, `pytest`,
-   `mypy`, `import-linter`, and a `Makefile`.
-2. Add the domain value objects first. These are pure Python and should pass
-   tests without installing FastAPI or Ultralytics.
+1. Create the project shell: `pyproject.toml`, `src/` layout, `pytest`, `mypy`, `import-linter`, and a `Makefile`.
+2. Add the domain value objects first. These are pure Python and should pass tests without installing FastAPI or Ultralytics.
 3. Add `service_layer/ports.py` with `AbstractInferenceEngine`.
 4. Add `service_layer/services.py` with `detect_objects(image_bytes, engine)`.
 5. Add a fake engine in tests and prove the service layer can run without YOLO.
@@ -104,8 +94,7 @@ The inverse must never happen. In particular, the service layer imports
 9. Add one marked slow smoke test that uses the real YOLO engine and sample JPEG.
 10. Lock the boundaries with `import-linter`, `mypy`, and `pytest`.
 
-This order prevents the infrastructure from shaping the core. The adapter comes
-after the port, and the HTTP layer comes after the use case is already testable.
+This order prevents the infrastructure from shaping the core. The adapter comes after the port, and the HTTP layer comes after the use case is already testable.
 
 ## 4. Domain Model
 
@@ -146,9 +135,7 @@ Domain exceptions should be limited to domain invariants:
 - `InvalidConfidence`
 - `InvalidImageDimensions`
 
-I would not put `InvalidImageError` or `InferenceError` in the domain. A corrupt
-JPEG and a failed model call are boundary/runtime failures, so they belong near
-the port or adapter.
+I would not put `InvalidImageError` or `InferenceError` in the domain. A corrupt JPEG and a failed model call are boundary/runtime failures, so they belong near the port or adapter.
 
 ## 5. Port and Service Layer
 
@@ -164,8 +151,7 @@ class AbstractInferenceEngine(ABC):
         ...
 ```
 
-The same module can define application/runtime exceptions that are part of the
-port contract:
+The same module can define application/runtime exceptions that are part of the port contract:
 
 ```python
 class InferenceEngineError(Exception):
@@ -190,8 +176,7 @@ def detect_objects(
     return engine.predict(image_bytes)
 ```
 
-The service layer does flow control and depends on the port. It does not decode
-images, touch tensors, know HTTP status codes, or import `YoloInferenceEngine`.
+The service layer does flow control and depends on the port. It does not decode images, touch tensors, know HTTP status codes, or import `YoloInferenceEngine`.
 
 ## 6. YOLO Adapter
 
@@ -208,10 +193,7 @@ class YoloInferenceEngine:
         ...
 ```
 
-This is the only production module allowed to import `ultralytics`, `torch`, or
-image decoding libraries such as Pillow/OpenCV. It accepts bytes, runs the model,
-filters confidence if configured, and maps raw model output into domain value
-objects. Raw tensors never leave this adapter.
+This is the only production module allowed to import `ultralytics`, `torch`, or image decoding libraries such as Pillow/OpenCV. It accepts bytes, runs the model, filters confidence if configured, and maps raw model output into domain value objects. Raw tensors never leave this adapter.
 
 ## 7. Entrypoint and App Factory
 
@@ -231,10 +213,8 @@ def create_app(engine: AbstractInferenceEngine | None = None) -> FastAPI:
 ```
 
 The production command imports `app = create_app()` and gets the real engine.
-Tests can use `create_app(engine=FakeInferenceEngine())`, so `TestClient`
-startup does not load YOLO unless the test explicitly asks for it.
-`bootstrap.py` is the composition root and is the only core-adjacent module that
-binds `AbstractInferenceEngine` to `YoloInferenceEngine`.
+Tests can use `create_app(engine=FakeInferenceEngine())`, so `TestClient` startup does not load YOLO unless the test explicitly asks for it.
+`bootstrap.py` is the composition root and is the only core-adjacent module that binds `AbstractInferenceEngine` to `YoloInferenceEngine`.
 
 `entrypoints/routes.py` should handle edge validation only:
 
@@ -300,8 +280,7 @@ HTTP mapping:
 | model/runtime failure | `InferenceRuntimeError` | `503` |
 | unexpected failure | fallback handler | `500` |
 
-DTOs live in `entrypoints/schemas.py`. Domain dataclasses are not the published
-HTTP contract.
+DTOs live in `entrypoints/schemas.py`. Domain dataclasses are not the published HTTP contract.
 
 ## 9. Testing Plan
 
@@ -314,8 +293,7 @@ The test pyramid should prove the dependency boundaries:
 | API integration | `tests/integration/test_api_fake_engine.py` | fake | full FastAPI request/response without YOLO startup |
 | Real smoke | `tests/e2e/test_api_real_yolo.py` | real YOLO | one marked slow end-to-end check |
 
-The real smoke test should use `@pytest.mark.slow` and be excluded from the
-default fast test command if local iteration speed matters.
+The real smoke test should use `@pytest.mark.slow` and be excluded from the default fast test command if local iteration speed matters.
 
 Suggested commands:
 
@@ -372,8 +350,7 @@ forbidden_modules =
     inference.entrypoints
 ```
 
-These contracts address the main review concern: the service layer cannot import
-from the YOLO adapter, and the adapter layer cannot reach up into HTTP code.
+These contracts address the main review concern: the service layer cannot import from the YOLO adapter, and the adapter layer cannot reach up into HTTP code.
 
 ## 11. AI Orchestration Strategy
 
@@ -388,16 +365,13 @@ I would use AI in narrow, layer-scoped prompts:
 - Final prompt: inspect imports against the `.importlinter` contract and fix any
   boundary violations.
 
-The human guardrail is that generated code must pass `pytest`, `mypy`, and
-`lint-imports` before it is considered acceptable. If AI suggests importing YOLO
-inside routes or placing the ABC in `adapters/inference.py`, that is rejected
-because it breaks the dependency rule and makes fake-engine API tests impossible.
+The human guardrail is that generated code must pass `pytest`, `mypy`, and `lint-imports` before it is considered acceptable. If AI suggests importing YOLO
+inside routes or placing the ABC in `adapters/inference.py`, that is rejected because it breaks the dependency rule and makes fake-engine API tests impossible.
 
 ## 12. Submission Readiness Checklist
 
 - README includes the same directory tree and clear install/test/run commands.
-- `models/yolov8n.pt` is either downloaded by documented command or auto-fetched
-  by Ultralytics on first run; weights are not committed.
+- `models/yolov8n.pt` is either downloaded by documented command or auto-fetched by Ultralytics on first run; weights are not committed.
 - Default tests are fast and deterministic.
 - Slow YOLO smoke test is clearly marked.
 - API examples in README match `entrypoints/schemas.py`.

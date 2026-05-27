@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="11in" height="8.5in" viewBox="0 0 1320 1020" role="img" aria-labelledby="title desc">
+  <title id="title">Request flow for the vision inference API</title>
+  <desc id="desc">A printable landscape request flow showing a JPEG upload through FastAPI validation, service layer, inference port, YOLO adapter, domain mapping, DTO serialization, and HTTP responses.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#263238"/>
+    </marker>
+    <marker id="error-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a3b12"/>
+    </marker>
+    <style>
+      .title { font: 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; fill: #202427; }
+      .subtitle { font: 17px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #46515a; }
+      .lane-title { font: 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; fill: #263238; }
+      .label { font: 17px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 650; fill: #263238; }
+      .small { font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #46515a; }
+      .tiny { font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #59636a; }
+      .lane { fill: #f7f8fa; stroke: #c7cdd1; stroke-width: 1.5; }
+      .client { fill: #dff4e7; stroke: #263238; stroke-width: 2; }
+      .entry { fill: #e8eef5; stroke: #263238; stroke-width: 2; }
+      .core { fill: #fff7ca; stroke: #263238; stroke-width: 2; }
+      .adapter { fill: #edf1f5; stroke: #263238; stroke-width: 2; }
+      .error { fill: #fff1df; stroke: #8a3b12; stroke-width: 2; }
+      .ok { fill: #e7f6ea; stroke: #2d6a3f; stroke-width: 2; }
+      .line { fill: none; stroke: #263238; stroke-width: 2.6; marker-end: url(#arrow); }
+      .error-line { fill: none; stroke: #8a3b12; stroke-width: 2.6; marker-end: url(#error-arrow); }
+      .note { fill: #ffffff; stroke: #d6dade; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1320" height="1020" fill="#ffffff"/>
+  <text x="660" y="58" text-anchor="middle" class="title">Request Flow: POST /v1/detect</text>
+  <text x="660" y="88" text-anchor="middle" class="subtitle">Printable one-page view of validation, use case orchestration, inference, mapping, and HTTP serialization</text>
+
+  <rect x="55" y="125" width="270" height="820" rx="12" class="lane"/>
+  <rect x="365" y="125" width="270" height="820" rx="12" class="lane"/>
+  <rect x="675" y="125" width="270" height="820" rx="12" class="lane"/>
+  <rect x="985" y="125" width="270" height="820" rx="12" class="lane"/>
+
+  <text x="190" y="160" text-anchor="middle" class="lane-title">Client</text>
+  <text x="500" y="160" text-anchor="middle" class="lane-title">Entrypoint</text>
+  <text x="810" y="160" text-anchor="middle" class="lane-title">Application Core</text>
+  <text x="1120" y="160" text-anchor="middle" class="lane-title">Driven Adapter</text>
+
+  <rect x="98" y="230" width="184" height="88" rx="10" class="client"/>
+  <text x="190" y="260" text-anchor="middle" class="label">1. Upload</text>
+  <text x="190" y="284" text-anchor="middle" class="small">multipart/form-data</text>
+  <text x="190" y="304" text-anchor="middle" class="small">JPEG file field</text>
+
+  <rect x="408" y="220" width="184" height="108" rx="10" class="entry"/>
+  <text x="500" y="250" text-anchor="middle" class="label">2. Route</text>
+  <text x="500" y="274" text-anchor="middle" class="small">FastAPI receives</text>
+  <text x="500" y="294" text-anchor="middle" class="small">UploadFile</text>
+  <text x="500" y="314" text-anchor="middle" class="tiny">entrypoints/routes.py</text>
+
+  <rect x="408" y="405" width="184" height="124" rx="10" class="entry"/>
+  <text x="500" y="435" text-anchor="middle" class="label">3. Edge validate</text>
+  <text x="500" y="459" text-anchor="middle" class="small">content type</text>
+  <text x="500" y="479" text-anchor="middle" class="small">size limit</text>
+  <text x="500" y="499" text-anchor="middle" class="small">JPEG magic bytes</text>
+  <text x="500" y="519" text-anchor="middle" class="tiny">no tensors, no model</text>
+
+  <rect x="718" y="412" width="184" height="108" rx="10" class="core"/>
+  <text x="810" y="442" text-anchor="middle" class="label">4. Use case</text>
+  <text x="810" y="466" text-anchor="middle" class="small">detect_objects</text>
+  <text x="810" y="486" text-anchor="middle" class="small">calls engine port</text>
+  <text x="810" y="506" text-anchor="middle" class="tiny">service_layer/services.py</text>
+
+  <rect x="718" y="610" width="184" height="96" rx="10" class="core"/>
+  <text x="810" y="641" text-anchor="middle" class="label">5. Port</text>
+  <text x="810" y="665" text-anchor="middle" class="small">AbstractInferenceEngine</text>
+  <text x="810" y="685" text-anchor="middle" class="tiny">service_layer/ports.py</text>
+
+  <rect x="1028" y="610" width="184" height="112" rx="10" class="adapter"/>
+  <text x="1120" y="640" text-anchor="middle" class="label">6. YOLO engine</text>
+  <text x="1120" y="664" text-anchor="middle" class="small">decode image</text>
+  <text x="1120" y="684" text-anchor="middle" class="small">run model</text>
+  <text x="1120" y="704" text-anchor="middle" class="tiny">adapters/inference.py</text>
+
+  <rect x="1028" y="780" width="184" height="96" rx="10" class="adapter"/>
+  <text x="1120" y="810" text-anchor="middle" class="label">7. Map output</text>
+  <text x="1120" y="834" text-anchor="middle" class="small">tensors to domain</text>
+  <text x="1120" y="854" text-anchor="middle" class="tiny">InferenceResult</text>
+
+  <rect x="408" y="760" width="184" height="112" rx="10" class="entry"/>
+  <text x="500" y="790" text-anchor="middle" class="label">8. Serialize</text>
+  <text x="500" y="814" text-anchor="middle" class="small">domain to DTO</text>
+  <text x="500" y="834" text-anchor="middle" class="small">JSON response</text>
+  <text x="500" y="854" text-anchor="middle" class="tiny">entrypoints/schemas.py</text>
+
+  <rect x="98" y="772" width="184" height="88" rx="10" class="ok"/>
+  <text x="190" y="802" text-anchor="middle" class="label">200 OK</text>
+  <text x="190" y="826" text-anchor="middle" class="small">detections JSON</text>
+  <text x="190" y="846" text-anchor="middle" class="tiny">stable API contract</text>
+
+  <rect x="98" y="430" width="184" height="92" rx="10" class="error"/>
+  <text x="190" y="460" text-anchor="middle" class="label">Invalid upload</text>
+  <text x="190" y="484" text-anchor="middle" class="small">400 / 413 / 415</text>
+  <text x="190" y="504" text-anchor="middle" class="tiny">error JSON</text>
+
+  <rect x="1028" y="430" width="184" height="92" rx="10" class="error"/>
+  <text x="1120" y="460" text-anchor="middle" class="label">Runtime failure</text>
+  <text x="1120" y="484" text-anchor="middle" class="small">422 / 503</text>
+  <text x="1120" y="504" text-anchor="middle" class="tiny">decoded at edge</text>
+
+  <path d="M282 274 L408 274" class="line"/>
+  <path d="M500 328 L500 405" class="line"/>
+  <path d="M592 467 L718 467" class="line"/>
+  <path d="M810 520 L810 610" class="line"/>
+  <path d="M902 658 L1028 658" class="line"/>
+  <path d="M1120 722 L1120 780" class="line"/>
+  <path d="M1028 828 C895 850 725 856 592 828" class="line"/>
+  <path d="M408 816 L282 816" class="line"/>
+
+  <path d="M408 476 L282 476" class="error-line"/>
+  <path d="M1034 476 C965 500 925 520 902 613" class="error-line"/>
+
+  <rect x="670" y="220" width="254" height="112" rx="10" class="note"/>
+  <text x="797" y="250" text-anchor="middle" class="label">Boundary rule</text>
+  <text x="797" y="276" text-anchor="middle" class="small">Routes pass bytes into the use case.</text>
+  <text x="797" y="298" text-anchor="middle" class="small">The service knows only the port.</text>
+  <text x="797" y="318" text-anchor="middle" class="small">YOLO details stay in the adapter.</text>
+
+  <text x="345" y="250" text-anchor="middle" class="tiny">POST /v1/detect</text>
+  <text x="655" y="445" text-anchor="middle" class="tiny">valid bytes</text>
+  <text x="965" y="636" text-anchor="middle" class="tiny">predict(bytes)</text>
+  <text x="815" y="885" text-anchor="middle" class="tiny">InferenceResult</text>
+  <text x="345" y="794" text-anchor="middle" class="tiny">response body</text>
+
+  <text x="660" y="970" text-anchor="middle" class="small">Print tip: this SVG is 11 x 8.5 inches and is intended for landscape, fit-to-page PDF export.</text>
+</svg>

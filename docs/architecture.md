@@ -3,14 +3,10 @@
 > **Status:** Design / scaffolding blueprint (no implementation yet).
 > **Scope:** High-level architecture for a Python image-inference API built on the
 > **Ports & Adapters / Onion Architecture** described in *Architecture Patterns with
-> Python* (Percival & Gregory — "Cosmic Python"; companion repo
-> [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
-> **Stack decisions:** FastAPI entrypoint · Ultralytics YOLO (`yolov8n.pt`) · `uv` +
-> `pyproject.toml` · `pytest` · `import-linter` + `mypy` as architectural guardrails.
+> Python* (Percival & Gregory — "Cosmic Python"; companion repo [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
+> **Stack decisions:** FastAPI entrypoint · Ultralytics YOLO (`yolov8n.pt`) · `uv` + `pyproject.toml` · `pytest` · `import-linter` + `mypy` as architectural guardrails.
 
-This document fixes the layering, the machine-learning **port**, the request flow, the
-domain model, the testing strategy, and the scalability story *before* any code is
-written. It is the blueprint the implementation and the submission `README.md` will follow.
+This document fixes the layering, the machine-learning **port**, the request flow, the domain model, the testing strategy, and the scalability story *before* any code is written. It is the blueprint the implementation and the submission `README.md` will follow.
 
 ## Contents
 
@@ -33,14 +29,9 @@ written. It is the blueprint the implementation and the submission `README.md` w
 
 ## 1. Overview & philosophy
 
-The service exposes a single HTTP endpoint that ingests a JPEG image, runs object
-detection with a pre-trained YOLO model, and returns structured detection metadata as
-JSON. The *interesting* part of the assignment is not the model — it is the **separation
-of concerns**: the business core must not know that it is being driven by HTTP, nor that
-inference happens to be performed by PyTorch/Ultralytics.
+The service exposes a single HTTP endpoint that ingests a JPEG image, runs object detection with a pre-trained YOLO model, and returns structured detection metadata as JSON. The *interesting* part of the assignment is not the model — it is the **separation of concerns**: the business core must not know that it is being driven by HTTP, nor that inference happens to be performed by PyTorch/Ultralytics.
 
-We organize the code as concentric layers and obey **one rule above all others — the
-Dependency Rule:**
+We organize the code as concentric layers and obey **one rule above all others — the Dependency Rule:**
 
 > Source-code dependencies point **inward**. Outer layers (web, ML frameworks) depend on
 > inner layers (service, domain). The **domain depends on nothing**. Nothing inner ever
@@ -53,46 +44,27 @@ Dependency Rule:**
 | **Adapters** (`adapters/`) | Concrete gateways to external/heavy systems (the ML runtime). Maps raw output → domain. | `domain`, the port, ultralytics/torch | entrypoints |
 | **Entrypoints** (`entrypoints/`) | Driving adapter: HTTP framework, edge validation, DTO ↔ domain mapping, exception→HTTP. | everything below | — |
 
-The payoff: the ML engine is swappable, the domain is trivially testable, and the HTTP
-contract can evolve without touching business logic.
+The payoff: the ML engine is swappable, the domain is trivially testable, and the HTTP contract can evolve without touching business logic.
 
 ## 2. Architecture at a glance
 
-The same inner/outer shape as a ports-and-adapters sketch: the application core owns the
-use case, domain model, and port. HTTP and YOLO are outside adapters.
+The same inner/outer shape as a ports-and-adapters sketch: the application core owns the use case, domain model, and port. HTTP and YOLO are outside adapters.
 
 ![Onion-style ports and adapters architecture|1344](diagrams/architecture-onion.svg)
 
-Note that the concrete `YoloInferenceEngine` depends on (implements) the abstract port.
-The dependency arrow points *inward toward the application core*; the core never imports
-the concrete adapter (see [§5](#5-key-decision-where-the-ml-port-lives)).
+Note that the concrete `YoloInferenceEngine` depends on (implements) the abstract port. The dependency arrow points *inward toward the application core*; the core never imports the concrete adapter (see [§5](#5-key-decision-where-the-ml-port-lives)).
 
 ## 3. Ports & Adapters (hexagonal) view
 
-The same design seen as a hexagon: the **application core** sits in the middle, **driving
-adapters** (things that call us — HTTP clients, a React UI) on one side, **driven
-adapters** (things we call — inference engines) on the other. The port is the contract at
-the boundary, which is what makes the engine swappable.
+The same design seen as a hexagon: the **application core** sits in the middle, **driving adapters** (things that call us — HTTP clients, a React UI) on one side, **driven adapters** (things we call — inference engines) on the other. The port is the contract at the boundary, which is what makes the engine swappable.
 
-```mermaid
-flowchart LR
-    Client(["HTTP Client / React UI"]) --> WebAdapter["Web Adapter (FastAPI entrypoint)"]
-    subgraph Core["Application Core"]
-        direction TB
-        SvcCore["Service Layer"] --> DomCore["Domain Model"]
-        SvcCore --> Port["AbstractInferenceEngine (PORT)"]
-    end
-    WebAdapter --> SvcCore
-    Yolo["YoloInferenceEngine"] -.-> Port
-    Onnx["OnnxEngine (future)"] -.-> Port
-    Triton["Triton/gRPC (future)"] -.-> Port
-    Yolo --> Weights[("yolov8n.pt")]
-```
+![Printable ports and adapters diagram|1289](diagrams/architecture-ports-adapters.svg)
 
-- **Driving adapter (left):** FastAPI today; could be a CLI, a gRPC server, or a message
-  consumer tomorrow — the core does not change.
-- **Driven adapter (right):** `YoloInferenceEngine` today; `OnnxEngine`, a Triton client,
-  or a remote gRPC engine later — selected at composition time, never referenced by the core.
+The ports-and-adapters view is provided as a landscape SVG so it can be printed or
+exported as a single-page PDF without relying on Mermaid rendering.
+
+- **Driving adapter (left):** FastAPI today; could be a CLI, a gRPC server, or a message consumer tomorrow — the core does not change.
+- **Driven adapter (right):** `YoloInferenceEngine` today; `OnnxEngine`, a Triton client, or a remote gRPC engine later — selected at composition time, never referenced by the core.
 
 ## 4. Project structure
 
@@ -157,29 +129,22 @@ A `src`-layout single package (`inference`), mirroring the book's verified conve
 
 ## 5. Key decision: where the ML port lives
 
-**Decision: put `AbstractInferenceEngine` in `service_layer/ports.py`, inside the
-application core.**
+**Decision: put `AbstractInferenceEngine` in `service_layer/ports.py`, inside the application core.**
 
-This makes the tutorial-style boundary explicit: the core defines what it needs from an
-inference engine, and infrastructure supplies an implementation. `YoloInferenceEngine`
-lives in `adapters/inference.py`, imports the core port, and maps raw YOLO output into
-domain objects. The service layer receives an `engine: AbstractInferenceEngine` parameter
-and never imports `YoloInferenceEngine`, `ultralytics`, or `torch`.
+This makes the tutorial-style boundary explicit: the core defines what it needs from an inference engine, and infrastructure supplies an implementation. `YoloInferenceEngine`
+lives in `adapters/inference.py`, imports the core port, and maps raw YOLO output into domain objects. The service layer receives an `engine: AbstractInferenceEngine` parameter and never imports `YoloInferenceEngine`, `ultralytics`, or `torch`.
 
 | Option | Pros | Cons |
 | --- | --- | --- |
 | **Dedicated `service_layer/ports.py`** *(chosen)* | Textbook hexagonal: the application owns its ports; cleanest dependency story; matches the inner/outer diagram. | Splits the ABC from its single implementation. |
 | Co-locate in `adapters/inference.py` | Similar to the book's repository example; fewer files. | A folder/import skim reads as "core depends on adapters"; importing the port risks importing adapter dependencies. |
 
-**Guardrail:** an `import-linter` contract forbids `domain` and `service_layer` from
-importing `torch`, `ultralytics`, `fastapi`, or anything under `inference.adapters` (see
+**Guardrail:** an `import-linter` contract forbids `domain` and `service_layer` from importing `torch`, `ultralytics`, `fastapi`, or anything under `inference.adapters` (see
 [§11](#11-architectural-guardrails-anti-vibe-coding)). The boundary is enforced by CI.
 
 ## 6. Domain model
 
-All domain types are **immutable value objects** — `@dataclass(frozen=True)`, stdlib only
-(`dataclasses`, `typing`, `datetime`). No `numpy`, no `torch`, no `pydantic`. Invariants
-are enforced in `__post_init__` and raise **domain** exceptions (not HTTP errors).
+All domain types are **immutable value objects** — `@dataclass(frozen=True)`, stdlib only (`dataclasses`, `typing`, `datetime`). No `numpy`, no `torch`, no `pydantic`. Invariants are enforced in `__post_init__` and raise **domain** exceptions (not HTTP errors).
 
 ```mermaid
 classDiagram
@@ -215,80 +180,34 @@ classDiagram
     Detection "1" *-- "1" DetectionLabel
 ```
 
-- **`BoundingBox`** — coordinates in **absolute pixel `xyxy`** (`x1, y1` top-left,
-  `x2, y2` bottom-right). This is YOLO's native `boxes.xyxy` output, so the adapter does
-  minimal mapping and the convention is unambiguous. `__post_init__` asserts `x2 >= x1`,
-  `y2 >= y1`, non-negative values, raising `InvalidBoundingBox`. Derived `@property`
-  helpers: `width`, `height`, `area`, `center`. *(Alternatives — normalized coords or
-  `xywh` — were rejected to avoid lossy/ambiguous conversions.)*
-- **`DetectionLabel`** — class identity (`class_id: int`, `name: str`), kept separate from
-  geometry and confidence.
-- **`Detection`** — one detected object: a `BoundingBox`, a `DetectionLabel`, and
-  `confidence: float` (validated to `[0.0, 1.0]`).
-- **`InferenceResult`** — aggregate for one inference call: `detections: tuple[Detection,
-  ...]` (a tuple, so the result is immutable and hashable) plus image metadata
-  (`image_width`, `image_height`), `inference_ms`, `model_name` (e.g. `"yolov8n"`), and
-  `created_at`. Convenience `count()` / `__len__`.
+- **`BoundingBox`** — coordinates in **absolute pixel `xyxy`** (`x1, y1` top-left, `x2, y2` bottom-right).
+	- This is YOLO's native `boxes.xyxy` output, so the adapter does minimal mapping and the convention is unambiguous. `__post_init__` asserts `x2 >= x1`, `y2 >= y1`, non-negative values, raising `InvalidBoundingBox`. Derived `@property` helpers: `width`, `height`, `area`, `center`. *(Alternatives — normalized coords or`xywh` — were rejected to avoid lossy/ambiguous conversions.)*
+- **`DetectionLabel`** — class identity (`class_id: int`, `name: str`), kept separate from geometry and confidence.
+- **`Detection`** — one detected object: a `BoundingBox`, a `DetectionLabel`, and `confidence: float` (validated to `[0.0, 1.0]`).
+- **`InferenceResult`** — aggregate for one inference call: `detections: tuple[Detection,...]` (a tuple, so the result is immutable and hashable) plus image metadata (`image_width`, `image_height`), `inference_ms`, `model_name` (e.g. `"yolov8n"`), and `created_at`. Convenience `count()` / `__len__`.
 
-`domain/exceptions.py` defines a pure hierarchy: `DomainError` →
-`InvalidImageError`, `InvalidBoundingBox`, `InferenceError`. None of these know anything
-about HTTP.
+`domain/exceptions.py` defines a pure hierarchy: `DomainError` → `InvalidImageError`, `InvalidBoundingBox`, `InferenceError`. None of these know anything about HTTP.
 
 ## 7. Request flow
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant R as Routes (entrypoint)
-    participant V as Edge Validation
-    participant S as Service Layer
-    participant E as AbstractInferenceEngine
-    participant Y as YoloInferenceEngine
-    participant D as Domain (InferenceResult)
-    C->>R: POST /v1/detect (multipart JPEG)
-    R->>V: validate content-type, size, magic bytes
-    alt invalid payload
-        V-->>R: raise edge error
-        R-->>C: 400 / 415 / 413 JSON error
-    else valid
-        V-->>R: ok (bytes)
-        R->>S: detect_objects(bytes, engine)
-        S->>E: predict(bytes)
-        E->>Y: (concrete) run model
-        Y->>D: map tensors -> VOs
-        Y-->>S: InferenceResult
-        S-->>R: InferenceResult (domain)
-        R->>R: map domain -> DTO
-        R-->>C: 200 JSON detections
-    end
-```
+![Printable request flow diagram|1289](diagrams/architecture-request-flow.svg)
+
+The request-flow diagram is provided as a landscape SVG so it can be printed or exported as a single-page PDF without the clipping that often happens with tall sequence diagrams.
 
 Step by step, with the responsible module:
 
 1. **Ingress** — `entrypoints/routes.py`: `POST /v1/detect`, `file: UploadFile = File(...)`
    for `multipart/form-data`. FastAPI handles multipart parsing.
-2. **Edge / structural validation** — `routes.py` (+ helpers): content-type is
-   `image/jpeg`, body non-empty, size under `MAX_UPLOAD_BYTES`, JPEG magic bytes
-   (`FF D8 FF`). This is *syntactic* validation only; no business rules live here.
-3. **Read bytes** — `routes.py` hands raw `bytes` to the service. The web layer never
-   touches tensors.
-4. **Service call** — `routes.py` calls
-   `service_layer.services.detect_objects(image_bytes, engine=<injected>)`, where the
-   engine is the singleton resolved at startup (see [§8](#8-dependency-injection--bootstrap)).
-5. **Use-case coordination** — `service_layer/services.py`: pure flow control; invokes the
-   **port** `engine.predict(image_bytes) -> InferenceResult` and returns the domain object.
-   Imports only `domain` and `service_layer.ports.AbstractInferenceEngine`.
-6. **Inference + mapping** — `adapters/inference.py` (`YoloInferenceEngine.predict`): the
-   *only* place `ultralytics`/`torch` is imported. Decodes the image, runs the network,
-   maps raw tensors (`results[0].boxes.xyxy/.conf/.cls`, `names`) into immutable value
-   objects. Raw tensors never leave this module.
-7. **Serialization** — `routes.py` + `entrypoints/schemas.py`: map the `InferenceResult`
-   to a Pydantic response DTO (`DetectionResponse`); FastAPI serializes it to JSON. The DTO
+2. **Edge / structural validation** — `routes.py` (+ helpers): content-type is `image/jpeg`, body non-empty, size under `MAX_UPLOAD_BYTES`, JPEG magic bytes (`FF D8 FF`). This is *syntactic* validation only; no business rules live here.
+3. **Read bytes** — `routes.py` hands raw `bytes` to the service. The web layer never touches tensors.
+4. **Service call** — `routes.py` calls `service_layer.services.detect_objects(image_bytes, engine=<injected>)`, where the engine is the singleton resolved at startup (see [§8](#8-dependency-injection--bootstrap)).
+5. **Use-case coordination** — `service_layer/services.py`: pure flow control; invokes the **port** `engine.predict(image_bytes) -> InferenceResult` and returns the domain object. Imports only `domain` and `service_layer.ports.AbstractInferenceEngine`.
+6. **Inference + mapping** — `adapters/inference.py` (`YoloInferenceEngine.predict`): the *only* place `ultralytics`/`torch` is imported. Decodes the image, runs the network,
+   maps raw tensors (`results[0].boxes.xyxy/.conf/.cls`, `names`) into immutable value objects. Raw tensors never leave this module.
+7. **Serialization** — `routes.py` + `entrypoints/schemas.py`: map the `InferenceResult` to a Pydantic response DTO (`DetectionResponse`); FastAPI serializes it to JSON. The DTO
    is the *published contract*, deliberately decoupled from the domain VO.
 
-**Exception → HTTP mapping** is centralized at the entrypoint
-(`@app.exception_handler(...)` in `entrypoints/app.py`). Domain code raises plain Python
-exceptions; only the edge knows status codes:
+**Exception → HTTP mapping** is centralized at the entrypoint (`@app.exception_handler(...)` in `entrypoints/app.py`). Domain code raises plain Python exceptions; only the edge knows status codes:
 
 | Condition | Raised in | HTTP status |
 | --- | --- | --- |
@@ -300,10 +219,8 @@ exceptions; only the edge knows status codes:
 
 ## 8. Dependency injection & bootstrap
 
-The model weights are loaded **once** at process start — never per request — via FastAPI's
-`lifespan`, which calls `bootstrap()` to build the concrete engine and stash it on
-`app.state`. Routes pull that singleton and pass it into the service as an
-`AbstractInferenceEngine`.
+The model weights are loaded **once** at process start — never per request — via FastAPI's `lifespan`, which calls `bootstrap()` to build the concrete engine and stash it on
+`app.state`. Routes pull that singleton and pass it into the service as an `AbstractInferenceEngine`.
 
 ```mermaid
 flowchart TB
@@ -314,9 +231,7 @@ flowchart TB
     AppState --> Routes["routes pass engine into service per request"]
 ```
 
-`bootstrap()` is the **composition root** — the single place where the abstract port is
-bound to a concrete adapter. Swapping engines (or injecting a fake in tests) is a one-line
-change here and nowhere else.
+`bootstrap()` is the **composition root** — the single place where the abstract port is bound to a concrete adapter. Swapping engines (or injecting a fake in tests) is a one-line change here and nowhere else.
 
 ## 9. Testing strategy
 
@@ -336,17 +251,12 @@ graph TB
     Fake["Fake engine"] -.->|injects| T2
 ```
 
-- **Unit (domain)** — assert value-object invariants (e.g. an invalid `BoundingBox` raises
-  `InvalidBoundingBox`). Pure, microsecond-fast.
-- **Unit (service)** — exercise `detect_objects()` against a `FakeInferenceEngine` that
-  implements the port and returns a canned `InferenceResult`. No weights, no network →
+- **Unit (domain)** — assert value-object invariants (e.g. an invalid `BoundingBox` raises `InvalidBoundingBox`). Pure, microsecond-fast.
+- **Unit (service)** — exercise `detect_objects()` against a `FakeInferenceEngine` that implements the port and returns a canned `InferenceResult`. No weights, no network →
   fast and deterministic, as the assignment requires.
-- **E2E** — drive the real `YoloInferenceEngine` through the FastAPI `TestClient` with a
-  real `sample.jpg`, asserting the full `POST` → JSON cycle.
+- **E2E** — drive the real `YoloInferenceEngine` through the FastAPI `TestClient` with a real `sample.jpg`, asserting the full `POST` → JSON cycle.
 
-The fake-engine test *is itself a guardrail*: it is only possible if the service depends
-solely on the port. If someone couples YOLO into the service, this fast test breaks
-(it would suddenly need real weights) — the boundary fails loudly in CI.
+The fake-engine test *is itself a guardrail*: it is only possible if the service depends solely on the port. If someone couples YOLO into the service, this fast test breaks (it would suddenly need real weights) — the boundary fails loudly in CI.
 
 ## 10. Scalability & modularity
 
@@ -363,29 +273,20 @@ flowchart LR
     P1 -.->|from| Img
 ```
 
-- **Swappable engines** — the port lets you drop in `OnnxInferenceEngine`,
-  `TritonInferenceEngine`, or `RemoteGrpcInferenceEngine` with zero changes to `domain` or
+- **Swappable engines** — the port lets you drop in `OnnxInferenceEngine`, `TritonInferenceEngine`, or `RemoteGrpcInferenceEngine` with zero changes to `domain` or
   `service_layer`. This is the primary extensibility story.
-- **Stateless horizontal scaling** — the only in-process state is the read-only loaded
-  model, so the API scales out as N identical replicas behind a load balancer.
-- **Config-driven** — `config.py` reads env vars (`MODEL_PATH`, `MODEL_NAME`,
-  `CONFIDENCE_THRESHOLD`, `MAX_UPLOAD_BYTES`, `API_VERSION`); no magic numbers in adapters.
-- **API versioning** — the `/v1` prefix plus the DTO seam means a new response shape ships
-  as `/v2` while the `v1` contract stays frozen.
-- **Async / batch (future)** — the port can grow `predict_batch(streams)`; heavy inference
-  can move to a worker queue so the entrypoint returns `202 Accepted` + a job id, all
+- **Stateless horizontal scaling** — the only in-process state is the read-only loaded model, so the API scales out as N identical replicas behind a load balancer.
+- **Config-driven** — `config.py` reads env vars (`MODEL_PATH`, `MODEL_NAME`,`CONFIDENCE_THRESHOLD`, `MAX_UPLOAD_BYTES`, `API_VERSION`); no magic numbers in adapters.
+- **API versioning** — the `/v1` prefix plus the DTO seam means a new response shape ships as `/v2` while the `v1` contract stays frozen.
+- **Async / batch (future)** — the port can grow `predict_batch(streams)`; heavy inference can move to a worker queue so the entrypoint returns `202 Accepted` + a job id, all
   without touching domain logic. GPU batching is the throughput lever.
-- **Observability** — structured logging + timing/metrics emitted at adapter and entrypoint
-  boundaries (the adapter records `inference_ms`); the domain stays silent of logging
+- **Observability** — structured logging + timing/metrics emitted at adapter and entrypoint boundaries (the adapter records `inference_ms`); the domain stays silent of logging
   frameworks. OpenTelemetry is the natural extension point.
-- **DTO seam** — `entrypoints/schemas.py` isolates the published contract so domain
-  refactors never break clients.
+- **DTO seam** — `entrypoints/schemas.py` isolates the published contract so domain refactors never break clients.
 
 ## 11. Architectural guardrails (anti "vibe coding")
 
-AI assistants love shortcuts — importing `torch` into the domain, returning raw tensors
-from a controller, loading the model inside the request handler. We make those shortcuts
-*fail the build*, not merely fail review.
+AI assistants love shortcuts — importing `torch` into the domain, returning raw tensors from a controller, loading the model inside the request handler. We make those shortcuts *fail the build*, not merely fail review.
 
 **Coupling anti-patterns we explicitly forbid:**
 
@@ -431,23 +332,16 @@ from a controller, loading the model inside the request handler. We make those s
       inference.adapters
   ```
 
-- **`mypy` + ABC** — `AbstractInferenceEngine(abc.ABC)` with an
-  `@abc.abstractmethod predict(...) -> InferenceResult`; the typed service parameter
-  (`engine: AbstractInferenceEngine`) makes the dependency-on-abstraction explicit.
-- **The fake-engine test** — the deterministic unit test only compiles against the port;
-  coupling YOLO into the service breaks it (see [§9](#9-testing-strategy)).
-- **CI / `Makefile`** — `make lint` runs `import-linter` + `mypy`; `make test` runs
-  `pytest`. A vibe-coded coupling never reaches `main`.
+- **`mypy` + ABC** — `AbstractInferenceEngine(abc.ABC)` with an `@abc.abstractmethod predict(...) -> InferenceResult`; the typed service parameter (`engine: AbstractInferenceEngine`) makes the dependency-on-abstraction explicit.
+- **The fake-engine test** — the deterministic unit test only compiles against the port; coupling YOLO into the service breaks it (see [§9](#9-testing-strategy)).
+- **CI / `Makefile`** — `make lint` runs `import-linter` + `mypy`; `make test` runs `pytest`. A vibe-coded coupling never reaches `main`.
 
 **AI Orchestration Strategy** (the human stays the architect):
 
-- **Layer-scoped prompting** — generate one layer at a time with explicit "do not import
-  X" constraints, rather than asking for the whole app at once.
-- **Guardrails in context** — paste the Dependency Rule table and the `import-linter`
-  contract into the prompt so the model designs *within* the boundary.
+- **Layer-scoped prompting** — generate one layer at a time with explicit "do not import X" constraints, rather than asking for the whole app at once.
+- **Guardrails in context** — paste the Dependency Rule table and the `import-linter` contract into the prompt so the model designs *within* the boundary.
 - **TDD-first** — write the fake-engine test before the service, forcing the port to exist.
-- **Automated review of AI output** — treat `import-linter`/`mypy`/`pytest` failures as the
-  first reviewer; a human signs off only after the guardrails are green.
+- **Automated review of AI output** — treat `import-linter`/`mypy`/`pytest` failures as the first reviewer; a human signs off only after the guardrails are green.
 
 ## 12. Tooling & setup
 
@@ -459,10 +353,7 @@ from a controller, loading the model inside the request handler. We make those s
 | Tests | **`pytest`** (`unit`, `e2e`) |
 | Architecture checks | **`import-linter`**, **`mypy`** |
 
-**Model weights** (`yolov8n.pt`, ~6 MB) are kept out of version control (`.gitignore`) and
-obtained either by Ultralytics' auto-download on first use or a documented manual download
-into `models/`. *Full, copy-pasteable install and run instructions belong in the submission
-`README.md`; this document only fixes the choices.*
+**Model weights** (`yolov8n.pt`, ~6 MB) are kept out of version control (`.gitignore`) and obtained either by Ultralytics' auto-download on first use or a documented manual download into `models/`. *Full, copy-pasteable install and run instructions belong in the submission `README.md`; this document only fixes the choices.*
 
 ## 13. Assignment-requirement coverage
 
@@ -479,10 +370,7 @@ into `models/`. *Full, copy-pasteable install and run instructions belong in the
 
 ## 14. Future extensions
 
-- **React UI (bonus)** — a second *driving adapter* that POSTs the JPEG to `/v1/detect`;
-  the core is untouched.
+- **React UI (bonus)** — a second *driving adapter* that POSTs the JPEG to `/v1/detect`; the core is untouched.
 - **Additional engines** — `OnnxInferenceEngine`, Triton, or remote gRPC behind the same port.
-- **Batch / async inference** — a `predict_batch` port method + a worker queue for GPU
-  throughput; the entrypoint returns `202 Accepted` + a job id.
-- **Persistence adapter** — an optional repository (book-style) to store results/audit
-  history, added as another driven adapter without disturbing the core.
+- **Batch / async inference** — a `predict_batch` port method + a worker queue for GPU throughput; the entrypoint returns `202 Accepted` + a job id.
+- **Persistence adapter** — an optional repository (book-style) to store results/audit history, added as another driven adapter without disturbing the core.

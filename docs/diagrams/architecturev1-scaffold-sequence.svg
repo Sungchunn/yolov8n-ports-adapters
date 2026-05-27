@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 520" role="img" aria-labelledby="title desc">
+  <title id="title">Scaffolding sequence for architecture v1</title>
+  <desc id="desc">A left to right implementation sequence from project tooling through domain, port, service, adapter, entrypoint, tests, and CI guardrails.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#263238"/>
+    </marker>
+    <style>
+      .title { font: 25px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; fill: #202427; }
+      .label { font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #263238; }
+      .small { font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4f5960; }
+      .tiny { font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #59636a; }
+      .box { fill: #fff7ca; stroke: #263238; stroke-width: 2; }
+      .outer { fill: #e8eef5; stroke: #263238; stroke-width: 2; }
+      .test { fill: #dff4e7; stroke: #263238; stroke-width: 2; }
+      .line { fill: none; stroke: #263238; stroke-width: 2.3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1120" height="520" fill="#ffffff"/>
+  <text x="560" y="48" text-anchor="middle" class="title">Scaffolding Construction Order</text>
+  <text x="560" y="76" text-anchor="middle" class="label">Build inward first, then wire outward, then enforce boundaries</text>
+
+  <rect x="58" y="180" width="128" height="92" rx="8" class="outer"/>
+  <text x="122" y="207" text-anchor="middle" class="tiny">Step 1</text>
+  <text x="122" y="232" text-anchor="middle" class="label">Project shell</text>
+  <text x="122" y="253" text-anchor="middle" class="small">pyproject, src,</text>
+  <text x="122" y="271" text-anchor="middle" class="small">test layout</text>
+
+  <rect x="226" y="180" width="128" height="92" rx="8" class="box"/>
+  <text x="290" y="207" text-anchor="middle" class="tiny">Step 2</text>
+  <text x="290" y="232" text-anchor="middle" class="label">Domain</text>
+  <text x="290" y="253" text-anchor="middle" class="small">frozen VOs,</text>
+  <text x="290" y="271" text-anchor="middle" class="small">invariants</text>
+
+  <rect x="394" y="180" width="128" height="92" rx="8" class="box"/>
+  <text x="458" y="207" text-anchor="middle" class="tiny">Step 3</text>
+  <text x="458" y="232" text-anchor="middle" class="label">Port</text>
+  <text x="458" y="253" text-anchor="middle" class="small">service_layer/</text>
+  <text x="458" y="271" text-anchor="middle" class="small">ports.py</text>
+
+  <rect x="562" y="180" width="128" height="92" rx="8" class="box"/>
+  <text x="626" y="207" text-anchor="middle" class="tiny">Step 4</text>
+  <text x="626" y="232" text-anchor="middle" class="label">Service</text>
+  <text x="626" y="253" text-anchor="middle" class="small">detect_objects</text>
+  <text x="626" y="271" text-anchor="middle" class="small">uses only port</text>
+
+  <rect x="730" y="180" width="128" height="92" rx="8" class="outer"/>
+  <text x="794" y="207" text-anchor="middle" class="tiny">Step 5</text>
+  <text x="794" y="232" text-anchor="middle" class="label">Adapter</text>
+  <text x="794" y="253" text-anchor="middle" class="small">YOLO engine,</text>
+  <text x="794" y="271" text-anchor="middle" class="small">mapping only</text>
+
+  <rect x="898" y="180" width="128" height="92" rx="8" class="outer"/>
+  <text x="962" y="207" text-anchor="middle" class="tiny">Step 6</text>
+  <text x="962" y="232" text-anchor="middle" class="label">Entrypoint</text>
+  <text x="962" y="253" text-anchor="middle" class="small">create_app,</text>
+  <text x="962" y="271" text-anchor="middle" class="small">routes, DTOs</text>
+
+  <path d="M186 226 L226 226" class="line"/>
+  <path d="M354 226 L394 226" class="line"/>
+  <path d="M522 226 L562 226" class="line"/>
+  <path d="M690 226 L730 226" class="line"/>
+  <path d="M858 226 L898 226" class="line"/>
+
+  <rect x="250" y="350" width="190" height="78" rx="8" class="test"/>
+  <text x="345" y="380" text-anchor="middle" class="label">Fast tests first</text>
+  <text x="345" y="404" text-anchor="middle" class="small">domain + fake-engine service tests</text>
+
+  <rect x="490" y="350" width="190" height="78" rx="8" class="test"/>
+  <text x="585" y="380" text-anchor="middle" class="label">API tests next</text>
+  <text x="585" y="404" text-anchor="middle" class="small">TestClient with injected fake engine</text>
+
+  <rect x="730" y="350" width="190" height="78" rx="8" class="test"/>
+  <text x="825" y="380" text-anchor="middle" class="label">One slow smoke</text>
+  <text x="825" y="404" text-anchor="middle" class="small">real YOLO marked pytest.mark.slow</text>
+
+  <path d="M290 272 C290 315 320 325 345 350" class="line"/>
+  <path d="M626 272 C626 315 606 325 585 350" class="line"/>
+  <path d="M794 272 C794 315 812 326 825 350" class="line"/>
+
+  <text x="560" y="470" text-anchor="middle" class="small">Final gate: pytest, mypy, and import-linter contracts run before submission.</text>
+</svg>

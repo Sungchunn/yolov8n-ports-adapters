@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 680" role="img" aria-labelledby="title desc">
+  <title id="title">Architecture v1 inner and outer layers</title>
+  <desc id="desc">An onion style diagram for a FastAPI vision inference service. The application core owns the domain model, service layer, and inference port. FastAPI and YOLO live outside the core.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#263238"/>
+    </marker>
+    <marker id="dash-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#586069"/>
+    </marker>
+    <style>
+      .title { font: 26px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; fill: #202427; }
+      .section { font: 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 650; fill: #263238; }
+      .label { font: 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #263238; }
+      .small { font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4f5960; }
+      .tiny { font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #59636a; }
+      .outer { fill: #f7f8fa; stroke: #263238; stroke-width: 3; }
+      .middle { fill: #ffffff; stroke: #263238; stroke-width: 3; }
+      .core { fill: #fff6bf; stroke: #263238; stroke-width: 3; }
+      .driver { fill: #dff4e7; stroke: #263238; stroke-width: 2; }
+      .adapter { fill: #e8eef5; stroke: #263238; stroke-width: 2; }
+      .port { fill: #fff6bf; stroke: #263238; stroke-width: 2; stroke-dasharray: 7 5; }
+      .domain { fill: #fff9db; stroke: #263238; stroke-width: 2; }
+      .line { fill: none; stroke: #263238; stroke-width: 2.5; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #586069; stroke-width: 2.5; stroke-dasharray: 8 7; marker-end: url(#dash-arrow); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1180" height="680" fill="#ffffff"/>
+  <text x="590" y="48" text-anchor="middle" class="title">Architecture v1: Inner Core, Outer Adapters</text>
+  <text x="590" y="78" text-anchor="middle" class="label">Vision inference API using FastAPI, a service-owned port, and a YOLO adapter</text>
+
+  <ellipse cx="590" cy="370" rx="455" ry="255" class="outer"/>
+  <ellipse cx="590" cy="370" rx="315" ry="185" class="middle"/>
+  <ellipse cx="590" cy="370" rx="185" ry="118" class="core"/>
+
+  <text x="590" y="139" text-anchor="middle" class="section">Outer layer: adapters and frameworks</text>
+  <text x="590" y="216" text-anchor="middle" class="section">Application layer: use cases and ports</text>
+  <text x="590" y="302" text-anchor="middle" class="section">Domain layer: pure values</text>
+
+  <rect x="58" y="323" width="124" height="80" rx="8" class="driver"/>
+  <text x="120" y="354" text-anchor="middle" class="label">HTTP client</text>
+  <text x="120" y="377" text-anchor="middle" class="small">multipart JPEG</text>
+
+  <rect x="222" y="306" width="160" height="114" rx="8" class="adapter"/>
+  <text x="302" y="333" text-anchor="middle" class="tiny">&lt;&lt;entrypoint&gt;&gt;</text>
+  <text x="302" y="357" text-anchor="middle" class="label">FastAPI</text>
+  <text x="302" y="381" text-anchor="middle" class="small">routes, DTOs,</text>
+  <text x="302" y="401" text-anchor="middle" class="small">edge validation</text>
+
+  <rect x="458" y="310" width="166" height="82" rx="8" class="domain"/>
+  <text x="541" y="337" text-anchor="middle" class="tiny">service_layer/services.py</text>
+  <text x="541" y="362" text-anchor="middle" class="label">detect_objects()</text>
+  <text x="541" y="383" text-anchor="middle" class="small">use case flow</text>
+
+  <rect x="456" y="437" width="170" height="76" rx="8" class="domain"/>
+  <text x="541" y="467" text-anchor="middle" class="tiny">domain/model.py</text>
+  <text x="541" y="491" text-anchor="middle" class="label">frozen value objects</text>
+
+  <rect x="675" y="316" width="190" height="84" rx="8" class="port"/>
+  <text x="770" y="344" text-anchor="middle" class="tiny">service_layer/ports.py</text>
+  <text x="770" y="368" text-anchor="middle" class="label">AbstractInferenceEngine</text>
+  <text x="770" y="389" text-anchor="middle" class="small">predict(bytes)</text>
+
+  <rect x="915" y="304" width="178" height="116" rx="8" class="adapter"/>
+  <text x="1004" y="332" text-anchor="middle" class="tiny">&lt;&lt;driven adapter&gt;&gt;</text>
+  <text x="1004" y="357" text-anchor="middle" class="label">YoloInferenceEngine</text>
+  <text x="1004" y="380" text-anchor="middle" class="small">ultralytics, torch,</text>
+  <text x="1004" y="400" text-anchor="middle" class="small">tensor to domain mapping</text>
+
+  <path d="M182 363 L222 363" class="line"/>
+  <path d="M382 363 L458 352" class="line"/>
+  <path d="M542 392 L542 437" class="line"/>
+  <path d="M624 352 L675 356" class="line"/>
+  <path d="M915 362 L865 362" class="dash"/>
+  <path d="M1004 420 C994 495 780 550 626 489" class="line"/>
+
+  <text x="202" y="343" text-anchor="middle" class="tiny">drives</text>
+  <text x="421" y="340" text-anchor="middle" class="tiny">raw bytes</text>
+  <text x="648" y="337" text-anchor="middle" class="tiny">calls port</text>
+  <text x="890" y="342" text-anchor="middle" class="tiny">implements</text>
+  <text x="831" y="540" text-anchor="middle" class="tiny">maps model output into InferenceResult</text>
+
+  <text x="590" y="635" text-anchor="middle" class="small">Dependency rule: domain and service_layer never import FastAPI, adapters, torch, or ultralytics.</text>
+</svg>

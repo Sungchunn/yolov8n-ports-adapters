@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# OS metadata
+.DS_Store
+
+# Downloaded model weights should be documented or downloaded, not committed.
+*.pt
+*.onnx
+*.engine

@@ -1,0 +1,32 @@
+[importlinter]
+root_package = inference
+include_external_packages = True
+
+[importlinter:contract:domain_is_pure]
+name = Domain must not depend on app, web, or ML frameworks
+type = forbidden
+source_modules =
+    inference.domain
+forbidden_modules =
+    inference.service_layer
+    inference.adapters
+    inference.entrypoints
+    fastapi
+    pydantic
+    cv2
+    ultralytics
+    torch
+
+[importlinter:contract:service_depends_only_inward]
+name = Service layer depends only on domain and ports
+type = forbidden
+source_modules =
+    inference.service_layer
+forbidden_modules =
+    inference.adapters
+    inference.entrypoints
+    fastapi
+    pydantic
+    cv2
+    ultralytics
+    torch

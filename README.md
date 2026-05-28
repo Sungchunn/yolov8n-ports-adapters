@@ -1,103 +1,145 @@
-# Technical Assignment: Clean Architecture & Vision AI Integration
+# Vision Inference API
 
-## Position: Mid-Level Full-Stack Python Software Engineer
+FastAPI service for object detection with a clean Ports and Adapters / Onion Architecture. The application core runs one-frame inference through an abstract port; HTTP upload handling, video sampling, webcam capture, OpenCV, and YOLO stay at the outer adapter edge.
 
-## 1. Context & Architectural Framework
+## Project Structure
 
-This assignment evaluates your ability to implement clean, decoupled architectural patterns in Python, specifically building upon the **Layered Architecture / Ports and Adapters (Onion Architecture)** concepts detailed in the book ***Architecture Patterns with Python*** (O'Reilly) by Harry Percival and Bob Gregory.
+```text
+.
+├── pyproject.toml
+├── .importlinter
+├── src/inference/
+│   ├── config.py
+│   ├── bootstrap.py
+│   ├── domain/
+│   │   ├── exceptions.py
+│   │   └── model.py
+│   ├── service_layer/
+│   │   ├── ports.py
+│   │   └── services.py
+│   ├── adapters/
+│   │   ├── inference.py
+│   │   └── media.py
+│   └── entrypoints/
+│       ├── app.py
+│       ├── routes.py
+│       └── schemas.py
+└── tests/
+    ├── unit/
+    └── integration/
+```
 
-Before starting, review the architectural foundations demonstrated in the book's official companion repository: [github.com/cosmicpython/code](https://github.com/cosmicpython/code).
+## Architecture
 
-### Architectural Separation Guidelines
+- `domain/` contains immutable value objects such as `InferenceResult`, `Detection`, `DetectionLabel`, and `BoundingBox`. It imports only standard-library code and owns validation invariants.
+- `service_layer/` owns the use case and the `AbstractInferenceEngine` port. It depends on the domain and never imports FastAPI, OpenCV, Ultralytics, or concrete adapters.
+- `adapters/` contains concrete infrastructure: `YoloInferenceEngine` and OpenCV media helpers for uploaded videos and local webcam frames.
+- `entrypoints/` contains FastAPI routes, request validation, DTO serialization, exception-to-HTTP mapping, and WebSocket streaming.
 
-Your solution must strictly respect the separation of concerns outlined in the text:
+The central use case is frame-based:
 
-* **Domain Model Layer (`domain/model.py`):** Contains pure business logic, domain entities, and value objects. This layer must remain completely isolated from infrastructure concerns, databases, web frameworks (FastAPI/Flask), or machine learning frameworks (PyTorch/Ultralytics).
-* **Service Layer / Use Cases (`service_layer/services.py`):** Coordinates the execution of use cases. It handles flow control, interacts with abstractions/ports, and manipulates domain abstractions without coupling directly to concrete external dependencies.
-* **Adapters / Infrastructure Layer (`adapters/`):** Implements concrete interfaces to external systems. This includes web framework entry points (API controllers), external network gateways, or heavy ML models.
+```python
+AbstractInferenceEngine.predict(image_bytes: bytes) -> InferenceResult
+```
 
----
+Image uploads, sampled video frames, and webcam frames are all converted to JPEG bytes at the edge and then sent through the same service-layer use case.
 
-## 2. Assignment Objective
+## Setup
 
-You are required to implement an API service that ingests user images, passes them through an AI vision model inference execution sequence, and returns structured prediction metadata—all structured according to the Cosmic Python decoupled architecture patterns.
+Install `uv`, then create the environment:
 
-### Core Technical Requirements
+```bash
+uv sync --extra dev --extra vision
+```
 
-#### 1. Entrypoint & Image Ingestion (Web Adapter)
+For fast tests without the real model stack, the vision extra is optional:
 
-* Expose an HTTP `POST` API endpoint (using **FastAPI** or **Flask**) capable of accepting a raw binary `JPEG` image via a `multipart/form-data` request payload.
-* Implement basic structural and format validation at the edge layer before passing the binary payload into the application core.
+```bash
+uv sync --extra dev
+```
 
-#### 2. Abstract Port for Machine Learning (Domain/Service Boundary)
+Download or place the YOLO weights at the configured path:
 
-* Define an explicit, abstract boundary interface (e.g., an Abstract Base Class named `AbstractInferenceEngine`) to decouple the application core from specific third-party machine learning frameworks.
-* Your application service layer should only ever depend on this abstract port interface, ensuring the model engine could be swapped seamlessly without rewriting core use-case flows.
+```bash
+mkdir -p models
+curl -L -o models/yolov8n.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt
+```
 
-#### 3. Vision Model Infrastructure (Concrete Adapter)
+Model weights are intentionally gitignored. The default runtime settings are environment-driven:
 
-* Implement a concrete class (e.g., `YoloInferenceEngine`) implementing your abstract engine.
-* Integrate a pre-trained open-source computer vision model such as an **Ultralytics YOLO** model (e.g., `yolov8n.pt`).
-* The adapter must accept raw input image streams, pass them to the underlying neural network, and process the raw output tensors.
+```text
+MODEL_PATH=models/yolov8n.pt
+CONFIDENCE_THRESHOLD=0.25
+MAX_UPLOAD_BYTES=20971520
+VIDEO_SAMPLE_INTERVAL_SECONDS=1.0
+MAX_VIDEO_FRAMES=60
+WEBCAM_INDEX=0
+WEBCAM_FPS_LIMIT=2
+```
 
-#### 4. Structured Domain Modeling
+## Run
 
-* Define clear, immutable Python `dataclasses` or Value Objects within the Domain Layer to encapsulate the prediction results cleanly (e.g., `InferenceResult`, `BoundingBox`, `DetectionLabel`).
-* Map the proprietary machine learning output structure into these domain objects within the adapter layer. The API must return a structured, clean JSON representation of this domain data.
+```bash
+uv run --extra vision uvicorn inference.entrypoints.app:app --reload
+```
 
-#### 5. Test-Driven Verification (TDD Execution)
+### JPEG Image
 
-* Write an integration/E2E test suite using `pytest` following the book's testing philosophy.
-* Ensure unit tests remain lightning fast and deterministic by providing a mocked or test-double version of the `AbstractInferenceEngine`.
-* Validate the full web request/response cycle via a separate integration test with a valid sample image.
+```bash
+curl -X POST http://127.0.0.1:8000/v1/detect/image \
+  -F "file=@sample.jpg;type=image/jpeg"
+```
 
----
+### Uploaded Video
 
-## 3. Human as the Architect: AI Orchestration & Guardrails
+```bash
+curl -X POST http://127.0.0.1:8000/v1/detect/video \
+  -F "file=@sample.mp4;type=video/mp4"
+```
 
-The modern full-stack development lifecycle frequently leverages autonomous agents or generative AI tools (e.g., Cursor, GitHub Copilot Workspace, Claude Code). While we encourage the use of these tools to speed up execution, an elite engineer must prevent unstructured **"Vibe Coding"**—where developers blindly accept AI-generated code without checking architectural alignment.
+Videos are sampled at `VIDEO_SAMPLE_INTERVAL_SECONDS` and capped by `MAX_VIDEO_FRAMES` to keep local CPU usage bounded.
 
-In your repository documentation, you are **required** to include a dedicated section explaining:
+### Local Webcam
 
-1. **AI Orchestration Strategy:** How you structured prompts or workspace constraints to generate clean, decoupled code.
-2. **Architectural Guardrails:** How you intervened or modified AI suggestions to prevent the AI from taking shortcuts, such as tightly coupling database/ML logic directly inside the API controllers or domain layer.
+```text
+ws://127.0.0.1:8000/v1/detect/webcam
+```
 
----
+The webcam endpoint uses `cv2.VideoCapture(WEBCAM_INDEX)` on the machine running FastAPI. A hosted backend cannot directly access a user laptop camera without a browser/client frontend that captures and sends frames.
 
-## 4. Submission & Evaluation Process
+Each WebSocket message contains one processed frame:
 
-To submit your assignment for evaluation, follow the execution steps precisely.
+```json
+{
+  "model": "yolov8n",
+  "image": {"width": 640, "height": 480},
+  "inference_ms": 12.5,
+  "detections": [],
+  "created_at": "2026-05-28T00:00:00Z",
+  "frame_index": 0,
+  "timestamp": "2026-05-28T00:00:00Z"
+}
+```
 
-### Step 1: Create a Repository
+Public livestream URLs are out of scope for v1 because they are fragile and often have licensing or embedding restrictions.
 
-* Set up a new **Public** repository in your personal GitHub account.
-* Initialize the repository with a clean, structured `README.md` file that includes:
-  * A high-level directory structure tree showing where the layers break down.
-  * Explicit step-by-step installation instructions for virtual environments, package management tool configurations, and model weights downloads.
-  * The explicit command-line steps required to execute the test suite (e.g., `pytest`).
+## Tests And Checks
 
-### Step 2: Prepare for Email Submission
+```bash
+uv run --extra dev pytest
+uv run --extra dev lint-imports
+uv run --extra dev mypy src
+```
 
-* Double-check that your repository is fully accessible to public, unauthenticated users.
-* Draft an email to the engineering evaluation team.
+The normal test suite uses a fake `AbstractInferenceEngine`, so it is fast and deterministic. Real YOLO smoke tests can be added under `@pytest.mark.slow` without making the default suite depend on model weights.
 
-### Step 3: Submit Your Work
+## AI Orchestration And Guardrails
 
-Send an email using the following parameters:
+The implementation was structured from an explicit architecture plan: domain value objects first, then the service-layer port, then concrete adapters, then FastAPI entrypoints. Prompts and review passes were scoped around keeping YOLO/OpenCV outside the core and making every input mode reuse one-frame inference.
 
-* **To:** `service@smartsurgerytek.com`
-* **Subject Line:** `Mid-Level Fullstack Software Engineer (Python) Technical Assignment Submission`
-* **Email Body Content:**
-  * Your full legal name and preferred phone contact details.
-  * A brief cover letter introducing yourself, highlighting key architectural takeaways from your implementation.
-  * The direct, clickable HTTPS link to your GitHub repository.
+Guardrails used in the codebase:
 
-### Step 4: Follow Up
-
-* The engineering team will review your implementation for architectural separation, testing rigor, and code elegance.
-* If you do not receive an acknowledgment within **one week**, you may follow up with a professional reply on the same email thread.
-* Be prepared to walk through your code decisions, explain your abstractions, and discuss your AI orchestration patterns in an upcoming live code review session.
-
-## 5. Bonus
-
-* Create a React web UI to submit the JPEG file by calling the new API endpoint.
+- `AbstractInferenceEngine` lives in `service_layer/ports.py`; the service depends on the abstraction, not `YoloInferenceEngine`.
+- `.importlinter` forbids domain and service-layer imports from FastAPI, Pydantic, OpenCV, Ultralytics, Torch, and adapters.
+- Tests inject `FakeInferenceEngine` through `create_app(engine=...)`, proving the API and service can run without loading model weights.
+- Video and webcam handling are adapter/entrypoint concerns. Raw OpenCV frames and YOLO tensors never enter the domain or service layer.

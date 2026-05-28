@@ -1,9 +1,7 @@
 # Architecture & Ports Design — Vision Inference API
 
 > **Status:** Design / scaffolding blueprint (no implementation yet).
-> **Scope:** High-level architecture for a Python image-inference API built on the
-> **Ports & Adapters / Onion Architecture** described in *Architecture Patterns with
-> Python* (Percival & Gregory — "Cosmic Python"; companion repo [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
+> **Scope:** High-level architecture for a Python image-inference API built on the **Ports & Adapters / Onion Architecture** described in *Architecture Patterns with Python* (Percival & Gregory — "Cosmic Python"; companion repo [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
 > **Stack decisions:** FastAPI entrypoint · Ultralytics YOLO (`yolov8n.pt`) · `uv` + `pyproject.toml` · `pytest` · `import-linter` + `mypy` as architectural guardrails.
 
 This document fixes the layering, the machine-learning **port**, the request flow, the domain model, the testing strategy, and the scalability story *before* any code is written. It is the blueprint the implementation and the submission `README.md` will follow.
@@ -33,9 +31,7 @@ The service exposes a single HTTP endpoint that ingests a JPEG image, runs objec
 
 We organize the code as concentric layers and obey **one rule above all others — the Dependency Rule:**
 
-> Source-code dependencies point **inward**. Outer layers (web, ML frameworks) depend on
-> inner layers (service, domain). The **domain depends on nothing**. Nothing inner ever
-> imports anything outer.
+> Source-code dependencies point **inward**. Outer layers (web, ML frameworks) depend on inner layers (service, domain). The **domain depends on nothing**. Nothing inner ever imports anything outer.
 
 | Layer | Responsibility | May import | Must **not** import |
 | --- | --- | --- | --- |
@@ -60,16 +56,14 @@ The same design seen as a hexagon: the **application core** sits in the middle, 
 
 ![Printable ports and adapters diagram|1289](diagrams/architecture-ports-adapters.svg)
 
-The ports-and-adapters view is provided as a landscape SVG so it can be printed or
-exported as a single-page PDF without relying on Mermaid rendering.
+The ports-and-adapters view is provided as a landscape SVG so it can be printed or exported as a single-page PDF without relying on Mermaid rendering.
 
 - **Driving adapter (left):** FastAPI today; could be a CLI, a gRPC server, or a message consumer tomorrow — the core does not change.
 - **Driven adapter (right):** `YoloInferenceEngine` today; `OnnxEngine`, a Triton client, or a remote gRPC engine later — selected at composition time, never referenced by the core.
 
 ## 4. Project structure
 
-A `src`-layout single package (`inference`), mirroring the book's verified conventions:
-`config.py` and `bootstrap.py` at the package root, tests split into `unit` and `e2e`.
+A `src`-layout single package (`inference`), mirroring the book's verified conventions: `config.py` and `bootstrap.py` at the package root, tests split into `unit` and `e2e`.
 
 ```text
 .
@@ -181,7 +175,7 @@ classDiagram
 ```
 
 - **`BoundingBox`** — coordinates in **absolute pixel `xyxy`** (`x1, y1` top-left, `x2, y2` bottom-right).
-	- This is YOLO's native `boxes.xyxy` output, so the adapter does minimal mapping and the convention is unambiguous. `__post_init__` asserts `x2 >= x1`, `y2 >= y1`, non-negative values, raising `InvalidBoundingBox`. Derived `@property` helpers: `width`, `height`, `area`, `center`. *(Alternatives — normalized coords or`xywh` — were rejected to avoid lossy/ambiguous conversions.)*
+  - This is YOLO's native `boxes.xyxy` output, so the adapter does minimal mapping and the convention is unambiguous. `__post_init__` asserts `x2 >= x1`, `y2 >= y1`, non-negative values, raising `InvalidBoundingBox`. Derived `@property` helpers: `width`, `height`, `area`, `center`. *(Alternatives — normalized coords or`xywh` — were rejected to avoid lossy/ambiguous conversions.)*
 - **`DetectionLabel`** — class identity (`class_id: int`, `name: str`), kept separate from geometry and confidence.
 - **`Detection`** — one detected object: a `BoundingBox`, a `DetectionLabel`, and `confidence: float` (validated to `[0.0, 1.0]`).
 - **`InferenceResult`** — aggregate for one inference call: `detections: tuple[Detection,...]` (a tuple, so the result is immutable and hashable) plus image metadata (`image_width`, `image_height`), `inference_ms`, `model_name` (e.g. `"yolov8n"`), and `created_at`. Convenience `count()` / `__len__`.

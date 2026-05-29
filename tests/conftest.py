@@ -7,9 +7,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 from inference.config import Settings
-from inference.domain.model import BoundingBox, Detection, DetectionLabel, InferenceResult
+from inference.domain.exceptions import UnsupportedMediaTypeError
+from inference.domain.model import (
+    BoundingBox,
+    Detection,
+    DetectionLabel,
+    InferenceResult,
+    MediaFrame,
+    MediaKind,
+    ProcessedMedia,
+)
 from inference.entrypoints.app import create_app
-from inference.service_layer.ports import AbstractInferenceEngine
+from inference.service_layer.ports import AbstractInferenceEngine, AbstractMediaProcessor
 
 
 SAMPLE_JPEG_BYTES = (
@@ -24,6 +33,8 @@ SAMPLE_JPEG_BYTES = (
     b"\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xd2\xcf "
     b"\xff\xd9"
 )
+
+SAMPLE_PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
 
 
 def _empty_call_log() -> list[bytes]:
@@ -51,18 +62,77 @@ class FakeInferenceEngine(AbstractInferenceEngine):
         )
 
 
+def _empty_media_call_log() -> list[tuple[bytes, str]]:
+    return []
+
+
+@dataclass
+class FakeMediaProcessor(AbstractMediaProcessor):
+    calls: list[tuple[bytes, str]] = field(default_factory=_empty_media_call_log)
+
+    def process(self, media_bytes: bytes, content_type: str) -> ProcessedMedia:
+        self.calls.append((media_bytes, content_type))
+        if content_type in {"image/jpeg", "image/jpg", "image/png"}:
+            return ProcessedMedia(
+                kind=MediaKind.IMAGE,
+                frames=(
+                    MediaFrame(
+                        frame_index=0,
+                        timestamp_seconds=None,
+                        image_bytes=media_bytes,
+                    ),
+                ),
+            )
+        if content_type in {
+            "video/mp4",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/webm",
+        }:
+            return ProcessedMedia(
+                kind=MediaKind.VIDEO,
+                frames=(
+                    MediaFrame(
+                        frame_index=0,
+                        timestamp_seconds=0.0,
+                        image_bytes=b"frame-0",
+                    ),
+                    MediaFrame(
+                        frame_index=30,
+                        timestamp_seconds=1.0,
+                        image_bytes=b"frame-1",
+                    ),
+                ),
+                sample_interval_seconds=1.0,
+            )
+        raise UnsupportedMediaTypeError(f"unsupported media type: {content_type}")
+
+
 @pytest.fixture
 def fake_engine() -> FakeInferenceEngine:
     return FakeInferenceEngine()
 
 
 @pytest.fixture
-def settings() -> Settings:
-    return Settings(max_upload_bytes=1024, webcam_fps_limit=0)
+def fake_media_processor() -> FakeMediaProcessor:
+    return FakeMediaProcessor()
 
 
 @pytest.fixture
-def client(fake_engine: FakeInferenceEngine, settings: Settings) -> Iterator[TestClient]:
-    app = create_app(engine=fake_engine, settings=settings)
+def settings() -> Settings:
+    return Settings(max_upload_bytes=1024)
+
+
+@pytest.fixture
+def client(
+    fake_engine: FakeInferenceEngine,
+    fake_media_processor: FakeMediaProcessor,
+    settings: Settings,
+) -> Iterator[TestClient]:
+    app = create_app(
+        engine=fake_engine,
+        media_processor=fake_media_processor,
+        settings=settings,
+    )
     with TestClient(app) as test_client:
         yield test_client

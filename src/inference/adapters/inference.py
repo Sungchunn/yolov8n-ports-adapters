@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -15,7 +16,7 @@ class YoloInferenceEngine(AbstractInferenceEngine):
         self.confidence_threshold = confidence_threshold
         self.model_name = Path(model_path).stem
         try:
-            from ultralytics import YOLO
+            yolo_constructor = getattr(import_module("ultralytics"), "YOLO")
         except Exception as exc:  # pragma: no cover - depends on optional runtime extra
             raise InferenceError(
                 "ultralytics is required for YoloInferenceEngine; "
@@ -23,7 +24,7 @@ class YoloInferenceEngine(AbstractInferenceEngine):
             ) from exc
 
         try:
-            self._model = YOLO(model_path)
+            self._model = yolo_constructor(model_path)
         except Exception as exc:  # pragma: no cover - depends on model/runtime
             raise InferenceError(f"failed to load YOLO model at {model_path}") from exc
 

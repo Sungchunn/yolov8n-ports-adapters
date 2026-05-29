@@ -6,7 +6,26 @@ import os
 import tempfile
 from typing import Any, Callable, Iterator, Protocol, cast
 
-from inference.domain.exceptions import InferenceError, InvalidVideoError
+from inference.domain.exceptions import (
+    InferenceError,
+    InvalidImageError,
+    InvalidVideoError,
+    UnsupportedMediaTypeError,
+)
+from inference.domain.model import MediaFrame, MediaKind, ProcessedMedia
+from inference.service_layer.ports import AbstractMediaProcessor
+
+IMAGE_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+}
+VIDEO_CONTENT_TYPES = {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/x-msvideo": ".avi",
+    "video/webm": ".webm",
+}
 
 
 class CaptureLike(Protocol):
@@ -43,10 +62,57 @@ def _load_cv2() -> Cv2Like:
         cv2 = import_module("cv2")
     except Exception as exc:  # pragma: no cover - depends on optional runtime extra
         raise InferenceError(
-            "opencv-python is required for video/webcam support; "
+            "opencv-python is required for video upload support; "
             "install with `uv sync --extra vision`"
         ) from exc
     return cast(Cv2Like, cv2)
+
+
+class OpenCvMediaProcessor(AbstractMediaProcessor):
+    def __init__(self, sample_interval_seconds: float, max_video_frames: int) -> None:
+        self.sample_interval_seconds = sample_interval_seconds
+        self.max_video_frames = max_video_frames
+
+    def process(self, media_bytes: bytes, content_type: str) -> ProcessedMedia:
+        if not media_bytes:
+            raise InvalidImageError("media payload must not be empty")
+        if content_type in IMAGE_CONTENT_TYPES:
+            self._validate_image(media_bytes, content_type)
+            return ProcessedMedia(
+                kind=MediaKind.IMAGE,
+                frames=(MediaFrame(frame_index=0, timestamp_seconds=None, image_bytes=media_bytes),),
+            )
+        if content_type in VIDEO_CONTENT_TYPES:
+            frames = sample_video_bytes(
+                media_bytes,
+                sample_interval_seconds=self.sample_interval_seconds,
+                max_frames=self.max_video_frames,
+                suffix=VIDEO_CONTENT_TYPES[content_type],
+            )
+            return ProcessedMedia(
+                kind=MediaKind.VIDEO,
+                frames=tuple(
+                    MediaFrame(
+                        frame_index=frame.frame_index,
+                        timestamp_seconds=frame.timestamp_seconds,
+                        image_bytes=frame.image_bytes,
+                    )
+                    for frame in frames
+                ),
+                sample_interval_seconds=self.sample_interval_seconds,
+            )
+        raise UnsupportedMediaTypeError(f"unsupported media type: {content_type}")
+
+    def _validate_image(self, media_bytes: bytes, content_type: str) -> None:
+        if content_type in {"image/jpeg", "image/jpg"}:
+            if not media_bytes.startswith(b"\xff\xd8\xff"):
+                raise InvalidImageError("upload payload is not a JPEG image")
+            return
+        if content_type == "image/png":
+            if not media_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+                raise InvalidImageError("upload payload is not a PNG image")
+            return
+        raise UnsupportedMediaTypeError(f"unsupported image media type: {content_type}")
 
 
 def open_capture(source: int | str) -> CaptureLike:
@@ -104,11 +170,11 @@ def sample_video_bytes(
     video_bytes: bytes,
     sample_interval_seconds: float,
     max_frames: int,
+    suffix: str = ".mp4",
 ) -> list[SampledFrame]:
     if not video_bytes:
         raise InvalidVideoError("video payload must not be empty")
 
-    suffix = ".mp4"
     path = ""
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:

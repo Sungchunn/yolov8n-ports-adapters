@@ -62,7 +62,7 @@ class YoloInferenceEngine(AbstractInferenceEngine):
         buffer = np.frombuffer(image_bytes, dtype=np.uint8)
         image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
         if image is None:
-            raise InvalidImageError("image payload is not a decodable JPEG")
+            raise InvalidImageError("image payload is not decodable")
         return image
 
     def _map_result(self, result: Any) -> tuple[Detection, ...]:

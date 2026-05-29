@@ -22,6 +22,7 @@ from inference.service_layer.ports import AbstractInferenceEngine, AbstractMedia
 
 
 STATIC_DIR = Path(__file__).with_name("static")
+ASSETS_DIR = Path(__file__).resolve().parents[3] / "assets"
 
 
 def create_app(
@@ -53,6 +54,7 @@ def create_app(
 
 
 def _register_frontend(app: FastAPI) -> None:
+    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)

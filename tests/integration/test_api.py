@@ -18,6 +18,13 @@ def test_frontend_index_is_served(client: TestClient) -> None:
     assert "Vision Inference" in response.text
 
 
+def test_asset_manifest_is_served(client: TestClient) -> None:
+    response = client.get("/assets/video/videos.json")
+
+    assert response.status_code == 200
+    assert response.json()[0]["contentType"] == "video/x-msvideo"
+
+
 def test_upload_jpeg_returns_image_detection_response(
     client: TestClient,
     fake_engine: FakeInferenceEngine,

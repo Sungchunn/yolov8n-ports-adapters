@@ -1,0 +1,26 @@
+[
+  {
+    "id": "cctv-morning-1",
+    "label": "CCTV morning 01854",
+    "src": "/assets/video/cctv052x2004080608x01854.avi",
+    "contentType": "video/x-msvideo"
+  },
+  {
+    "id": "cctv-midday-1",
+    "label": "CCTV midday 00002",
+    "src": "/assets/video/cctv052x2004080612x00002.avi",
+    "contentType": "video/x-msvideo"
+  },
+  {
+    "id": "cctv-afternoon-1",
+    "label": "CCTV afternoon 00046",
+    "src": "/assets/video/cctv052x2004080616x00046.avi",
+    "contentType": "video/x-msvideo"
+  },
+  {
+    "id": "cctv-evening-1",
+    "label": "CCTV evening 00107",
+    "src": "/assets/video/cctv052x2004080620x00107.avi",
+    "contentType": "video/x-msvideo"
+  }
+]

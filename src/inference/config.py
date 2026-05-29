@@ -23,8 +23,6 @@ class Settings:
         "VIDEO_SAMPLE_INTERVAL_SECONDS", 1.0
     )
     max_video_frames: int = _int_from_env("MAX_VIDEO_FRAMES", 60)
-    webcam_index: int = _int_from_env("WEBCAM_INDEX", 0)
-    webcam_fps_limit: float = _float_from_env("WEBCAM_FPS_LIMIT", 2.0)
 
 
 def get_settings() -> Settings:

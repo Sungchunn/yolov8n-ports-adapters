@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from inference.bootstrap import bootstrap
 from inference.config import Settings, get_settings
@@ -17,6 +19,9 @@ from inference.domain.exceptions import (
 )
 from inference.entrypoints.routes import create_router
 from inference.service_layer.ports import AbstractInferenceEngine, AbstractMediaProcessor
+
+
+STATIC_DIR = Path(__file__).with_name("static")
 
 
 def create_app(
@@ -42,8 +47,17 @@ def create_app(
         app.state.media_processor = media_processor
 
     app.include_router(create_router(resolved_settings))
+    _register_frontend(app)
     _register_exception_handlers(app)
     return app
+
+
+def _register_frontend(app: FastAPI) -> None:
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @app.get("/", include_in_schema=False)
+    async def frontend_index() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
 
 
 def _register_exception_handlers(app: FastAPI) -> None:

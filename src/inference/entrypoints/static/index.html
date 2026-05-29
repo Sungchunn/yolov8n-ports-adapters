@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vision Inference</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">VI</span>
+          <div>
+            <h1>Vision Inference</h1>
+            <p>Upload-only object detection preview</p>
+          </div>
+        </div>
+        <div class="endpoint-pill">POST /v1/detect/upload</div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel intake-panel" aria-labelledby="upload-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="upload-title">Media Intake</h2>
+              <p>Images and sampled videos are analyzed through the same endpoint.</p>
+            </div>
+          </div>
+
+          <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Choose or drop media file">
+            <input
+              id="file-input"
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,video/mp4,video/quicktime,video/x-msvideo,video/webm"
+              hidden
+            >
+            <div class="drop-icon" aria-hidden="true"></div>
+            <h3>Drop media here</h3>
+            <p>JPEG, PNG, MP4, MOV, AVI, or WebM. Default max upload is 20 MB.</p>
+            <button id="choose-button" class="button primary" type="button">Choose File</button>
+          </div>
+
+          <div class="preview-shell" aria-live="polite">
+            <div id="media-preview" class="media-preview">
+              <span>No media selected</span>
+            </div>
+            <div id="file-meta" class="file-meta">Select a file to start.</div>
+          </div>
+
+          <div class="action-row">
+            <button id="analyze-button" class="button primary" type="button" disabled>Analyze</button>
+            <button id="clear-button" class="button secondary" type="button" disabled>Clear</button>
+          </div>
+        </section>
+
+        <section class="panel results-panel" aria-labelledby="results-title">
+          <div class="panel-heading results-heading">
+            <div>
+              <h2 id="results-title">Detection Result</h2>
+              <p id="result-subtitle">Waiting for an upload.</p>
+            </div>
+            <span id="status-badge" class="status-badge idle">Idle</span>
+          </div>
+
+          <div class="metric-grid" aria-label="Detection summary">
+            <div class="metric-tile">
+              <span>Media</span>
+              <strong id="metric-kind">-</strong>
+            </div>
+            <div class="metric-tile">
+              <span>Detections</span>
+              <strong id="metric-detections">-</strong>
+            </div>
+            <div class="metric-tile">
+              <span>Avg Inference</span>
+              <strong id="metric-latency">-</strong>
+            </div>
+            <div class="metric-tile">
+              <span>Top Label</span>
+              <strong id="metric-label">-</strong>
+            </div>
+          </div>
+
+          <div id="empty-state" class="empty-state">
+            <h3>Ready for analysis</h3>
+            <p>Upload a still image or video to see detection labels, confidence scores, bounding box data, and sampled frame timing.</p>
+          </div>
+
+          <div id="result-content" class="result-content" hidden>
+            <section class="result-section" aria-labelledby="detections-title">
+              <div class="section-heading">
+                <h3 id="detections-title">Detections</h3>
+                <span id="detection-count">0 rows</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th>Label</th>
+                      <th>Confidence</th>
+                      <th>Box</th>
+                      <th>Area</th>
+                    </tr>
+                  </thead>
+                  <tbody id="detections-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section id="frames-section" class="result-section" aria-labelledby="frames-title" hidden>
+              <div class="section-heading">
+                <h3 id="frames-title">Sampled Frames</h3>
+                <span id="frame-count">0 frames</span>
+              </div>
+              <div id="frames-list" class="frames-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

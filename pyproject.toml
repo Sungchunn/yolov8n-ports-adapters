@@ -1,7 +1,7 @@
 [project]
 name = "assignment-inference-python"
 version = "0.1.0"
-description = "Clean Architecture FastAPI service for YOLO image, video, and webcam inference."
+description = "Clean Architecture FastAPI service for YOLO image and video upload inference."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

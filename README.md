@@ -87,6 +87,10 @@ datasets should stay local and are ignored by Git.
 uv run --extra vision uvicorn inference.entrypoints.app:app --reload
 ```
 
+Open `http://127.0.0.1:8000/` for the no-login upload preview UI. It posts to
+the same public upload endpoint and renders image detections, video frame
+summaries, confidence scores, and bounding box data.
+
 ### Upload Image Or Video
 
 ```bash

@@ -225,3 +225,11 @@ __marimo__/
 *.onnx
 *.engine
 .obsidian
+
+# Local datasets and third-party media downloads should not be committed.
+# Keep only original, curated demo media under assets/demo/.
+/data/
+/assets/*
+!/assets/README.md
+!/assets/demo/
+!/assets/demo/**

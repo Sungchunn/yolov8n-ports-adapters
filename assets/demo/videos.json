@@ -1,0 +1,20 @@
+[
+  {
+    "id": "synthetic-light",
+    "label": "Synthetic light traffic",
+    "src": "/assets/demo/videos/synthetic-light.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "synthetic-medium",
+    "label": "Synthetic medium traffic",
+    "src": "/assets/demo/videos/synthetic-medium.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "synthetic-heavy",
+    "label": "Synthetic heavy traffic",
+    "src": "/assets/demo/videos/synthetic-heavy.mp4",
+    "contentType": "video/mp4"
+  }
+]

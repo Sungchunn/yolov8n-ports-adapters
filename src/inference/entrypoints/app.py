@@ -13,27 +13,33 @@ from inference.domain.exceptions import (
     InferenceError,
     InvalidImageError,
     InvalidVideoError,
+    UnsupportedMediaTypeError,
 )
 from inference.entrypoints.routes import create_router
-from inference.service_layer.ports import AbstractInferenceEngine
+from inference.service_layer.ports import AbstractInferenceEngine, AbstractMediaProcessor
 
 
 def create_app(
     *,
     engine: AbstractInferenceEngine | None = None,
+    media_processor: AbstractMediaProcessor | None = None,
     settings: Settings | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        if engine is None:
-            app.state.engine = bootstrap(resolved_settings)
+        if engine is None or media_processor is None:
+            dependencies = bootstrap(resolved_settings)
+            app.state.inference_engine = engine or dependencies.inference_engine
+            app.state.media_processor = media_processor or dependencies.media_processor
         yield
 
     app = FastAPI(title="Vision Inference API", lifespan=lifespan)
     if engine is not None:
-        app.state.engine = engine
+        app.state.inference_engine = engine
+    if media_processor is not None:
+        app.state.media_processor = media_processor
 
     app.include_router(create_router(resolved_settings))
     _register_exception_handlers(app)
@@ -52,6 +58,12 @@ def _register_exception_handlers(app: FastAPI) -> None:
         _request: Request, exc: InvalidVideoError
     ) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(UnsupportedMediaTypeError)
+    async def unsupported_media_type_handler(
+        _request: Request, exc: UnsupportedMediaTypeError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=415, content={"detail": str(exc)})
 
     @app.exception_handler(InferenceError)
     async def inference_error_handler(

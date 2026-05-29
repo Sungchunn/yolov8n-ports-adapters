@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from inference.domain.model import Detection, InferenceResult
+from inference.domain.model import Detection, InferenceResult, MediaKind
+from inference.service_layer.services import MediaDetectionResult
 
 
 class BoxResponse(BaseModel):
@@ -54,6 +56,20 @@ class VideoResponse(BaseModel):
     frames: list[VideoFrameResponse]
 
 
+class ImageUploadResponse(BaseModel):
+    kind: Literal["image"]
+    result: InferenceResponse
+
+
+class VideoUploadResponse(BaseModel):
+    kind: Literal["video"]
+    sample_interval_seconds: float
+    frames: list[VideoFrameResponse]
+
+
+UploadResponse = ImageUploadResponse | VideoUploadResponse
+
+
 def detection_to_response(detection: Detection) -> DetectionResponse:
     return DetectionResponse(
         label=LabelResponse(
@@ -81,4 +97,28 @@ def inference_to_response(result: InferenceResult) -> InferenceResponse:
         inference_ms=result.inference_ms,
         detections=[detection_to_response(item) for item in result.detections],
         created_at=result.created_at,
+    )
+
+
+def media_detection_to_response(result: MediaDetectionResult) -> UploadResponse:
+    if result.kind == MediaKind.IMAGE:
+        return ImageUploadResponse(
+            kind="image",
+            result=inference_to_response(result.frames[0].result),
+        )
+
+    sample_interval_seconds = result.sample_interval_seconds
+    if sample_interval_seconds is None:
+        raise ValueError("video result must include sample_interval_seconds")
+    return VideoUploadResponse(
+        kind="video",
+        sample_interval_seconds=sample_interval_seconds,
+        frames=[
+            VideoFrameResponse(
+                **inference_to_response(frame.result).model_dump(),
+                frame_index=frame.frame_index,
+                timestamp_seconds=frame.timestamp_seconds or 0.0,
+            )
+            for frame in result.frames
+        ],
     )

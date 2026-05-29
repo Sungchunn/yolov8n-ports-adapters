@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import StrEnum
 
 from inference.domain.exceptions import InvalidBoundingBox, InvalidDetection
 
@@ -87,3 +88,43 @@ class InferenceResult:
 
     def count(self) -> int:
         return len(self)
+
+
+class MediaKind(StrEnum):
+    IMAGE = "image"
+    VIDEO = "video"
+
+
+@dataclass(frozen=True)
+class MediaFrame:
+    frame_index: int
+    timestamp_seconds: float | None
+    image_bytes: bytes
+
+    def __post_init__(self) -> None:
+        if self.frame_index < 0:
+            raise InvalidDetection("frame_index must be non-negative")
+        if self.timestamp_seconds is not None and self.timestamp_seconds < 0:
+            raise InvalidDetection("timestamp_seconds must be non-negative")
+        if not self.image_bytes:
+            raise InvalidDetection("frame image bytes must not be empty")
+
+
+@dataclass(frozen=True)
+class ProcessedMedia:
+    kind: MediaKind
+    frames: Sequence[MediaFrame]
+    sample_interval_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.frames:
+            raise InvalidDetection("processed media must contain at least one frame")
+        if not isinstance(self.frames, tuple):
+            object.__setattr__(self, "frames", tuple(self.frames))
+        if self.kind == MediaKind.IMAGE and len(self.frames) != 1:
+            raise InvalidDetection("image media must contain exactly one frame")
+        if self.kind == MediaKind.VIDEO:
+            if self.sample_interval_seconds is None:
+                raise InvalidDetection("video media must include a sample interval")
+            if self.sample_interval_seconds <= 0:
+                raise InvalidDetection("sample interval must be positive")

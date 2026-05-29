@@ -13,6 +13,10 @@ class InvalidVideoError(DomainError):
     """Raised when video bytes cannot be decoded or sampled."""
 
 
+class UnsupportedMediaTypeError(DomainError):
+    """Raised when uploaded media has no supported processing adapter."""
+
+
 class InvalidBoundingBox(DomainError):
     """Raised when bounding-box coordinates are structurally invalid."""
 

@@ -43,5 +43,5 @@ warn_unused_configs = true
 exclude = ["tests"]
 
 [[tool.mypy.overrides]]
-module = ["ultralytics.*", "cv2.*", "numpy.*"]
+module = ["cv2.*", "numpy.*"]
 ignore_missing_imports = true

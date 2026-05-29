@@ -1,6 +1,6 @@
 # Vision Inference API
 
-FastAPI service for object detection with a clean Ports and Adapters / Onion Architecture. The application core runs one-frame inference through an abstract port; HTTP upload handling, video sampling, webcam capture, OpenCV, and YOLO stay at the outer adapter edge.
+FastAPI service for object detection with a clean Ports and Adapters / Onion Architecture. The application core runs upload detection through abstract ports; HTTP upload handling, image/video processing, OpenCV, and YOLO stay at the outer adapter edge.
 
 ## Project Structure
 
@@ -31,18 +31,19 @@ FastAPI service for object detection with a clean Ports and Adapters / Onion Arc
 
 ## Architecture
 
-- `domain/` contains immutable value objects such as `InferenceResult`, `Detection`, `DetectionLabel`, and `BoundingBox`. It imports only standard-library code and owns validation invariants.
-- `service_layer/` owns the use case and the `AbstractInferenceEngine` port. It depends on the domain and never imports FastAPI, OpenCV, Ultralytics, or concrete adapters.
-- `adapters/` contains concrete infrastructure: `YoloInferenceEngine` and OpenCV media helpers for uploaded videos and local webcam frames.
-- `entrypoints/` contains FastAPI routes, request validation, DTO serialization, exception-to-HTTP mapping, and WebSocket streaming.
+- `domain/` contains immutable value objects such as `InferenceResult`, `Detection`, `DetectionLabel`, `BoundingBox`, `ProcessedMedia`, and `MediaFrame`. It imports only standard-library code and owns validation invariants.
+- `service_layer/` owns the use cases and the core-owned ports: `AbstractInferenceEngine` and `AbstractMediaProcessor`. It depends on the domain and never imports FastAPI, OpenCV, Ultralytics, or concrete adapters.
+- `adapters/` contains concrete infrastructure: `YoloInferenceEngine` and `OpenCvMediaProcessor` for uploaded images and videos.
+- `entrypoints/` contains FastAPI routes, request validation, DTO serialization, and exception-to-HTTP mapping.
 
-The central use case is frame-based:
+The core ports are:
 
 ```python
 AbstractInferenceEngine.predict(image_bytes: bytes) -> InferenceResult
+AbstractMediaProcessor.process(media_bytes: bytes, content_type: str) -> ProcessedMedia
 ```
 
-Image uploads, sampled video frames, and webcam frames are all converted to JPEG bytes at the edge and then sent through the same service-layer use case.
+Image and video uploads are converted into inference-ready image frames by the media processor adapter, then sent through the same one-frame inference port.
 
 ## Setup
 
@@ -73,8 +74,6 @@ CONFIDENCE_THRESHOLD=0.25
 MAX_UPLOAD_BYTES=20971520
 VIDEO_SAMPLE_INTERVAL_SECONDS=1.0
 MAX_VIDEO_FRAMES=60
-WEBCAM_INDEX=0
-WEBCAM_FPS_LIMIT=2
 ```
 
 ## Run
@@ -83,45 +82,54 @@ WEBCAM_FPS_LIMIT=2
 uv run --extra vision uvicorn inference.entrypoints.app:app --reload
 ```
 
-### JPEG Image
+### Upload Image Or Video
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/detect/image \
+curl -X POST http://127.0.0.1:8000/v1/detect/upload \
   -F "file=@sample.jpg;type=image/jpeg"
 ```
 
-### Uploaded Video
-
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/detect/video \
-  -F "file=@sample.mp4;type=video/mp4"
+curl -X POST http://127.0.0.1:8000/v1/detect/upload \
+  -F "file=@sample.avi;type=video/x-msvideo"
 ```
 
-Videos are sampled at `VIDEO_SAMPLE_INTERVAL_SECONDS` and capped by `MAX_VIDEO_FRAMES` to keep local CPU usage bounded.
+Supported image types are JPEG and PNG. Supported video types are MP4, MOV/QuickTime, AVI, and WebM. Videos are sampled at `VIDEO_SAMPLE_INTERVAL_SECONDS` and capped by `MAX_VIDEO_FRAMES` to keep local CPU usage bounded.
 
-### Local Webcam
-
-```text
-ws://127.0.0.1:8000/v1/detect/webcam
-```
-
-The webcam endpoint uses `cv2.VideoCapture(WEBCAM_INDEX)` on the machine running FastAPI. A hosted backend cannot directly access a user laptop camera without a browser/client frontend that captures and sends frames.
-
-Each WebSocket message contains one processed frame:
+Image responses are wrapped as:
 
 ```json
 {
-  "model": "yolov8n",
-  "image": {"width": 640, "height": 480},
-  "inference_ms": 12.5,
-  "detections": [],
-  "created_at": "2026-05-28T00:00:00Z",
-  "frame_index": 0,
-  "timestamp": "2026-05-28T00:00:00Z"
+  "kind": "image",
+  "result": {
+    "model": "yolov8n",
+    "image": {"width": 640, "height": 480},
+    "inference_ms": 12.5,
+    "detections": [],
+    "created_at": "2026-05-28T00:00:00Z"
+  }
 }
 ```
 
-Public livestream URLs are out of scope for v1 because they are fragile and often have licensing or embedding restrictions.
+Video responses contain sampled frame results:
+
+```json
+{
+  "kind": "video",
+  "sample_interval_seconds": 1.0,
+  "frames": [
+    {
+      "model": "yolov8n",
+      "image": {"width": 640, "height": 480},
+      "inference_ms": 12.5,
+      "detections": [],
+      "created_at": "2026-05-28T00:00:00Z",
+      "frame_index": 0,
+      "timestamp_seconds": 0.0
+    }
+  ]
+}
+```
 
 ## Tests And Checks
 
@@ -131,15 +139,15 @@ uv run --extra dev lint-imports
 uv run --extra dev mypy src
 ```
 
-The normal test suite uses a fake `AbstractInferenceEngine`, so it is fast and deterministic. Real YOLO smoke tests can be added under `@pytest.mark.slow` without making the default suite depend on model weights.
+The normal test suite uses fake `AbstractInferenceEngine` and `AbstractMediaProcessor` implementations, so it is fast and deterministic. Real YOLO smoke tests can be added under `@pytest.mark.slow` without making the default suite depend on model weights.
 
 ## AI Orchestration And Guardrails
 
-The implementation was structured from an explicit architecture plan: domain value objects first, then the service-layer port, then concrete adapters, then FastAPI entrypoints. Prompts and review passes were scoped around keeping YOLO/OpenCV outside the core and making every input mode reuse one-frame inference.
+The implementation was structured from an explicit architecture plan: domain value objects first, then service-layer ports, then concrete adapters, then FastAPI entrypoints. Prompts and review passes were scoped around keeping YOLO/OpenCV outside the core and making every upload mode reuse one-frame inference.
 
 Guardrails used in the codebase:
 
-- `AbstractInferenceEngine` lives in `service_layer/ports.py`; the service depends on the abstraction, not `YoloInferenceEngine`.
+- `AbstractInferenceEngine` and `AbstractMediaProcessor` live in `service_layer/ports.py`; the service depends on abstractions, not `YoloInferenceEngine` or `OpenCvMediaProcessor`.
 - `.importlinter` forbids domain and service-layer imports from FastAPI, Pydantic, OpenCV, Ultralytics, Torch, and adapters.
-- Tests inject `FakeInferenceEngine` through `create_app(engine=...)`, proving the API and service can run without loading model weights.
-- Video and webcam handling are adapter/entrypoint concerns. Raw OpenCV frames and YOLO tensors never enter the domain or service layer.
+- Tests inject `FakeInferenceEngine` and `FakeMediaProcessor` through `create_app(...)`, proving the API and service can run without loading model weights or OpenCV.
+- Image/video upload handling is an adapter concern. Raw OpenCV frames and YOLO tensors never enter the domain or service layer.

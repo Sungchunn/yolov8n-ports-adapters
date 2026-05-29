@@ -256,6 +256,59 @@ p {
   font-size: 0.86rem;
 }
 
+.sample-library {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfd;
+}
+
+.sample-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.sample-button {
+  display: grid;
+  min-height: 74px;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sample-button:hover:not(:disabled) {
+  border-color: rgb(22 122 100 / 45%);
+  background: #f0f8f5;
+}
+
+.sample-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.sample-button strong {
+  overflow: hidden;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sample-button span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .action-row {
   display: flex;
   flex-wrap: wrap;

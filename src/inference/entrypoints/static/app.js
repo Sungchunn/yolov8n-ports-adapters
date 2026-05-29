@@ -14,6 +14,8 @@ const detectionCount = document.querySelector("#detection-count");
 const framesSection = document.querySelector("#frames-section");
 const framesList = document.querySelector("#frames-list");
 const frameCount = document.querySelector("#frame-count");
+const sampleList = document.querySelector("#sample-list");
+const sampleCount = document.querySelector("#sample-count");
 
 const metrics = {
   kind: document.querySelector("#metric-kind"),
@@ -24,6 +26,8 @@ const metrics = {
 
 let selectedFile = null;
 let previewUrl = null;
+
+loadSampleLibrary();
 
 chooseButton.addEventListener("click", () => fileInput.click());
 
@@ -127,6 +131,77 @@ function selectFile(file) {
   setStatus("Ready", "ready");
   resetResults();
   resultSubtitle.textContent = "Ready to analyze selected media.";
+}
+
+async function loadSampleLibrary() {
+  const manifests = ["/assets/demo/videos.json", "/assets/video/videos.json"];
+  const samples = [];
+
+  for (const manifest of manifests) {
+    try {
+      const response = await fetch(manifest);
+      if (response.ok) {
+        samples.push(...(await response.json()));
+      }
+    } catch (_error) {
+      // Missing local sample manifests should not block normal uploads.
+    }
+  }
+
+  renderSamples(samples);
+}
+
+function renderSamples(samples) {
+  sampleList.replaceChildren();
+  sampleCount.textContent = `${samples.length} ${samples.length === 1 ? "sample" : "samples"}`;
+
+  if (samples.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = "No bundled samples were found.";
+    sampleList.append(empty);
+    return;
+  }
+
+  for (const sample of samples) {
+    const button = document.createElement("button");
+    button.className = "sample-button";
+    button.type = "button";
+
+    const label = document.createElement("strong");
+    label.textContent = sample.label;
+
+    const type = document.createElement("span");
+    type.textContent = sample.contentType;
+
+    button.append(label, type);
+    button.addEventListener("click", () => selectSample(sample, button));
+    sampleList.append(button);
+  }
+}
+
+async function selectSample(sample, button) {
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+
+  try {
+    const response = await fetch(sample.src);
+    if (!response.ok) {
+      throw new Error(`Sample request failed with ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const fileName = sample.src.split("/").pop() || `${sample.id}.mp4`;
+    const file = new File([blob], fileName, {
+      type: sample.contentType || blob.type || "application/octet-stream",
+    });
+    selectFile(file);
+  } catch (error) {
+    renderError(error);
+    setStatus("Error", "error");
+  } finally {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
 }
 
 function renderResult(payload) {

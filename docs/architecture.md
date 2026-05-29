@@ -1,10 +1,10 @@
 # Architecture & Ports Design — Vision Inference API
 
-> **Status:** Design / scaffolding blueprint (no implementation yet).
-> **Scope:** High-level architecture for a Python image-inference API built on the **Ports & Adapters / Onion Architecture** described in *Architecture Patterns with Python* (Percival & Gregory — "Cosmic Python"; companion repo [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
+> **Status:** Implemented architecture reference.
+> **Scope:** High-level architecture for a Python image/video upload inference API built on the **Ports & Adapters / Onion Architecture** described in *Architecture Patterns with Python* (Percival & Gregory — "Cosmic Python"; companion repo [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
 > **Stack decisions:** FastAPI entrypoint · Ultralytics YOLO (`yolov8n.pt`) · `uv` + `pyproject.toml` · `pytest` · `import-linter` + `mypy` as architectural guardrails.
 
-This document fixes the layering, the machine-learning **port**, the request flow, the domain model, the testing strategy, and the scalability story *before* any code is written. It is the blueprint the implementation and the submission `README.md` will follow.
+This document fixes the layering, the machine-learning and media-processing **ports**, the request flow, the domain model, the testing strategy, and the scalability story.
 
 ## Contents
 
@@ -27,7 +27,7 @@ This document fixes the layering, the machine-learning **port**, the request flo
 
 ## 1. Overview & philosophy
 
-The service exposes a single HTTP endpoint that ingests a JPEG image, runs object detection with a pre-trained YOLO model, and returns structured detection metadata as JSON. The *interesting* part of the assignment is not the model — it is the **separation of concerns**: the business core must not know that it is being driven by HTTP, nor that inference happens to be performed by PyTorch/Ultralytics.
+The service exposes a single HTTP endpoint that ingests an uploaded image or video, runs object detection with a pre-trained YOLO model, and returns structured detection metadata as JSON. The *interesting* part of the assignment is not the model — it is the **separation of concerns**: the business core must not know that it is being driven by HTTP, nor that media processing happens to use OpenCV or inference happens to use PyTorch/Ultralytics.
 
 We organize the code as concentric layers and obey **one rule above all others — the Dependency Rule:**
 
@@ -44,11 +44,11 @@ The payoff: the ML engine is swappable, the domain is trivially testable, and th
 
 ## 2. Architecture at a glance
 
-The same inner/outer shape as a ports-and-adapters sketch: the application core owns the use case, domain model, and port. HTTP and YOLO are outside adapters.
+The same inner/outer shape as a ports-and-adapters sketch: the application core owns the use case, domain model, and ports. HTTP, OpenCV, and YOLO are outside adapters.
 
 ![Onion-style ports and adapters architecture|1344](diagrams/architecture-onion.svg)
 
-Note that the concrete `YoloInferenceEngine` depends on (implements) the abstract port. The dependency arrow points *inward toward the application core*; the core never imports the concrete adapter (see [§5](#5-key-decision-where-the-ml-port-lives)).
+Note that the concrete `YoloInferenceEngine` and `OpenCvMediaProcessor` depend on core-owned abstract ports. The dependency arrow points *inward toward the application core*; the core never imports concrete adapters.
 
 ## 3. Ports & Adapters (hexagonal) view
 
@@ -59,7 +59,7 @@ The same design seen as a hexagon: the **application core** sits in the middle, 
 The ports-and-adapters view is provided as a landscape SVG so it can be printed or exported as a single-page PDF without relying on Mermaid rendering.
 
 - **Driving adapter (left):** FastAPI today; could be a CLI, a gRPC server, or a message consumer tomorrow — the core does not change.
-- **Driven adapter (right):** `YoloInferenceEngine` today; `OnnxEngine`, a Triton client, or a remote gRPC engine later — selected at composition time, never referenced by the core.
+- **Driven adapter (right):** `YoloInferenceEngine` and `OpenCvMediaProcessor` today; an ONNX engine, Triton client, remote gRPC engine, or alternate media processor later — selected at composition time, never referenced by the core.
 
 ## 4. Project structure
 
@@ -78,25 +78,25 @@ A `src`-layout single package (`inference`), mirroring the book's verified conve
 │   └── inference/
 │       ├── __init__.py
 │       ├── config.py           # env-driven settings (MODEL_PATH, MODEL_NAME, thresholds, MAX_UPLOAD_BYTES, API_VERSION)
-│       ├── bootstrap.py        # DI: instantiate the engine ONCE, inject AbstractInferenceEngine
+│       ├── bootstrap.py        # DI: instantiate concrete adapters once, inject ports
 │       ├── domain/
 │       │   ├── __init__.py
-│       │   ├── model.py        # frozen value objects: InferenceResult, Detection, BoundingBox, DetectionLabel
+│       │   ├── model.py        # frozen value objects: InferenceResult, Detection, ProcessedMedia, MediaFrame
 │       │   └── exceptions.py   # framework-free domain errors
 │       ├── service_layer/
 │       │   ├── __init__.py
-│       │   ├── ports.py        # AbstractInferenceEngine port owned by the application core
-│       │   └── services.py     # use-case functions; depend ONLY on the port
+│       │   ├── ports.py        # AbstractInferenceEngine and AbstractMediaProcessor ports
+│       │   └── services.py     # use-case functions; depend ONLY on core ports
 │       ├── adapters/
 │       │   ├── __init__.py
 │       │   └── inference.py    # YoloInferenceEngine + tensor→domain mapping
 │       └── entrypoints/
 │           ├── __init__.py
 │           ├── app.py          # FastAPI app, lifespan model-load, exception handlers
-│           ├── routes.py       # POST /v1/detect controller + edge validation
+│           ├── routes.py       # POST /v1/detect/upload controller + edge validation
 │           └── schemas.py      # Pydantic DTOs (published API contract; isolates HTTP from domain)
 └── tests/
-    ├── conftest.py             # FakeInferenceEngine, TestClient, sample-image fixtures
+    ├── conftest.py             # FakeInferenceEngine, FakeMediaProcessor, TestClient fixtures
     ├── pytest.ini
     ├── assets/
     │   └── sample.jpg
@@ -111,13 +111,13 @@ A `src`-layout single package (`inference`), mirroring the book's verified conve
 
 | Assignment requirement | Module(s) |
 | --- | --- |
-| 1. Web adapter: `POST` multipart JPEG + edge validation | `entrypoints/app.py`, `entrypoints/routes.py`, `entrypoints/schemas.py` |
-| 2. Abstract port `AbstractInferenceEngine` | `service_layer/ports.py` |
+| 1. Web adapter: `POST /v1/detect/upload` multipart media + edge validation | `entrypoints/app.py`, `entrypoints/routes.py`, `entrypoints/schemas.py` |
+| 2. Abstract ports `AbstractInferenceEngine` and `AbstractMediaProcessor` | `service_layer/ports.py` |
 | 3. Concrete `YoloInferenceEngine` (Ultralytics) | `adapters/inference.py` |
 | 4a. Immutable domain value objects | `domain/model.py` |
 | 4b. ML tensors → domain mapping | `YoloInferenceEngine` in `adapters/inference.py` |
 | 4c. Clean JSON of domain data | `entrypoints/schemas.py` + `entrypoints/routes.py` |
-| 5a. Fast unit tests with a fake engine | `tests/unit/test_services.py`, `tests/conftest.py` |
+| 5a. Fast unit tests with fake ports | `tests/unit/test_services.py`, `tests/conftest.py` |
 | 5b. Integration / E2E with a real image | `tests/e2e/test_api.py` |
 | AI guardrails (README §3) | this document + enforced by `.importlinter` |
 
@@ -135,6 +135,8 @@ lives in `adapters/inference.py`, imports the core port, and maps raw YOLO outpu
 
 **Guardrail:** an `import-linter` contract forbids `domain` and `service_layer` from importing `torch`, `ultralytics`, `fastapi`, or anything under `inference.adapters` (see
 [§11](#11-architectural-guardrails-anti-vibe-coding)). The boundary is enforced by CI.
+
+The same rule applies to uploaded media processing. `AbstractMediaProcessor` also lives in `service_layer/ports.py`; the service states that it needs media bytes and a content type converted into inference-ready `MediaFrame` objects. `OpenCvMediaProcessor` lives in `adapters/media.py`, validates JPEG/PNG payloads, samples uploaded videos including AVI files, and returns framework-free `ProcessedMedia`. The route never imports OpenCV helpers, and the service never knows which library decoded or sampled the upload.
 
 ## 6. Domain model
 
@@ -179,8 +181,9 @@ classDiagram
 - **`DetectionLabel`** — class identity (`class_id: int`, `name: str`), kept separate from geometry and confidence.
 - **`Detection`** — one detected object: a `BoundingBox`, a `DetectionLabel`, and `confidence: float` (validated to `[0.0, 1.0]`).
 - **`InferenceResult`** — aggregate for one inference call: `detections: tuple[Detection,...]` (a tuple, so the result is immutable and hashable) plus image metadata (`image_width`, `image_height`), `inference_ms`, `model_name` (e.g. `"yolov8n"`), and `created_at`. Convenience `count()` / `__len__`.
+- **`MediaKind`, `MediaFrame`, `ProcessedMedia`** — framework-free upload-processing value objects. A media processor adapter converts a single uploaded file into one image frame or many sampled video frames before inference.
 
-`domain/exceptions.py` defines a pure hierarchy: `DomainError` → `InvalidImageError`, `InvalidBoundingBox`, `InferenceError`. None of these know anything about HTTP.
+`domain/exceptions.py` defines a pure hierarchy including `InvalidImageError`, `InvalidVideoError`, `UnsupportedMediaTypeError`, `InvalidBoundingBox`, and `InferenceError`. None of these know anything about HTTP.
 
 ## 7. Request flow
 
@@ -190,42 +193,43 @@ The request-flow diagram is provided as a landscape SVG so it can be printed or 
 
 Step by step, with the responsible module:
 
-1. **Ingress** — `entrypoints/routes.py`: `POST /v1/detect`, `file: UploadFile = File(...)`
+1. **Ingress** — `entrypoints/routes.py`: `POST /v1/detect/upload`, `file: UploadFile = File(...)`
    for `multipart/form-data`. FastAPI handles multipart parsing.
-2. **Edge / structural validation** — `routes.py` (+ helpers): content-type is `image/jpeg`, body non-empty, size under `MAX_UPLOAD_BYTES`, JPEG magic bytes (`FF D8 FF`). This is *syntactic* validation only; no business rules live here.
-3. **Read bytes** — `routes.py` hands raw `bytes` to the service. The web layer never touches tensors.
-4. **Service call** — `routes.py` calls `service_layer.services.detect_objects(image_bytes, engine=<injected>)`, where the engine is the singleton resolved at startup (see [§8](#8-dependency-injection--bootstrap)).
-5. **Use-case coordination** — `service_layer/services.py`: pure flow control; invokes the **port** `engine.predict(image_bytes) -> InferenceResult` and returns the domain object. Imports only `domain` and `service_layer.ports.AbstractInferenceEngine`.
+2. **Edge / structural validation** — `routes.py` reads the upload, rejects empty payloads, and enforces `MAX_UPLOAD_BYTES`. Media type interpretation is delegated through the core media port.
+3. **Service call** — `routes.py` calls `service_layer.services.detect_media(media_bytes, content_type, inference_engine, media_processor)`, where both ports are injected singletons resolved at startup (see [§8](#8-dependency-injection--bootstrap)).
+4. **Media processing** — `services.py` invokes `AbstractMediaProcessor.process(...) -> ProcessedMedia`. `OpenCvMediaProcessor` validates JPEG/PNG payloads or samples uploaded videos into image frames.
+5. **Use-case coordination** — `services.py` runs each `MediaFrame.image_bytes` through `AbstractInferenceEngine.predict(...)`. Imports only `domain` and `service_layer.ports`.
 6. **Inference + mapping** — `adapters/inference.py` (`YoloInferenceEngine.predict`): the *only* place `ultralytics`/`torch` is imported. Decodes the image, runs the network,
    maps raw tensors (`results[0].boxes.xyxy/.conf/.cls`, `names`) into immutable value objects. Raw tensors never leave this module.
-7. **Serialization** — `routes.py` + `entrypoints/schemas.py`: map the `InferenceResult` to a Pydantic response DTO (`DetectionResponse`); FastAPI serializes it to JSON. The DTO
+7. **Serialization** — `routes.py` + `entrypoints/schemas.py`: map the media detection result to an image or video upload response; FastAPI serializes it to JSON. The DTO
    is the *published contract*, deliberately decoupled from the domain VO.
 
 **Exception → HTTP mapping** is centralized at the entrypoint (`@app.exception_handler(...)` in `entrypoints/app.py`). Domain code raises plain Python exceptions; only the edge knows status codes:
 
 | Condition | Raised in | HTTP status |
 | --- | --- | --- |
-| Bad/missing content-type | edge validation | `415 Unsupported Media Type` |
+| Bad/missing content-type | media adapter → surfaced as domain error | `415 Unsupported Media Type` |
 | Empty / oversize body | edge validation | `400` / `413 Payload Too Large` |
 | Undecodable / corrupt image (`InvalidImageError`) | adapter → surfaced as domain error | `422 Unprocessable Entity` |
+| Undecodable / corrupt video (`InvalidVideoError`) | adapter → surfaced as domain error | `422 Unprocessable Entity` |
 | Model/runtime failure (`InferenceError`) | adapter | `503 Service Unavailable` |
 | Anything else | — | `500 Internal Server Error` |
 
 ## 8. Dependency injection & bootstrap
 
-The model weights are loaded **once** at process start — never per request — via FastAPI's `lifespan`, which calls `bootstrap()` to build the concrete engine and stash it on
-`app.state`. Routes pull that singleton and pass it into the service as an `AbstractInferenceEngine`.
+The model weights and media processor are created **once** at process start — never per request — via FastAPI's `lifespan`, which calls `bootstrap()` to build the concrete adapters and stash them on
+`app.state`. Routes pull those singletons and pass them into the service as `AbstractInferenceEngine` and `AbstractMediaProcessor`.
 
 ```mermaid
 flowchart TB
     Start(["App startup (lifespan)"]) --> BS["bootstrap()"]
     Cfg["config.py (MODEL_PATH, MODEL_NAME)"] --> BS
-    BS --> Inst["instantiate YoloInferenceEngine (load yolov8n.pt once)"]
-    Inst --> AppState["store engine on app.state as AbstractInferenceEngine"]
-    AppState --> Routes["routes pass engine into service per request"]
+    BS --> Inst["instantiate YoloInferenceEngine and OpenCvMediaProcessor"]
+    Inst --> AppState["store ports on app.state"]
+    AppState --> Routes["routes pass ports into service per request"]
 ```
 
-`bootstrap()` is the **composition root** — the single place where the abstract port is bound to a concrete adapter. Swapping engines (or injecting a fake in tests) is a one-line change here and nowhere else.
+`bootstrap()` is the **composition root** — the single place where abstract ports are bound to concrete adapters. Swapping engines/media processors (or injecting fakes in tests) is a one-line change here and nowhere else.
 
 ## 9. Testing strategy
 
@@ -353,8 +357,8 @@ AI assistants love shortcuts — importing `torch` into the domain, returning ra
 
 | README item | Addressed by |
 | --- | --- |
-| §2.1 Web adapter — `POST` multipart JPEG + edge validation | [§4](#4-project-structure), [§7](#7-request-flow) |
-| §2.2 Abstract port `AbstractInferenceEngine` | [§3](#3-ports--adapters-hexagonal-view), [§5](#5-key-decision-where-the-ml-port-lives) |
+| §2.1 Web adapter — `POST /v1/detect/upload` multipart media + edge validation | [§4](#4-project-structure), [§7](#7-request-flow) |
+| §2.2 Abstract ports `AbstractInferenceEngine` and `AbstractMediaProcessor` | [§3](#3-ports--adapters-hexagonal-view), [§5](#5-key-decision-where-the-ml-port-lives) |
 | §2.3 Concrete `YoloInferenceEngine` (Ultralytics) | [§5](#5-key-decision-where-the-ml-port-lives), [§7](#7-request-flow) |
 | §2.4 Immutable domain VOs + tensor→domain mapping + clean JSON | [§6](#6-domain-model), [§7](#7-request-flow) |
 | §2.5 `pytest` — fast fake-engine unit tests + real-image E2E | [§9](#9-testing-strategy) |
@@ -364,7 +368,7 @@ AI assistants love shortcuts — importing `torch` into the domain, returning ra
 
 ## 14. Future extensions
 
-- **React UI (bonus)** — a second *driving adapter* that POSTs the JPEG to `/v1/detect`; the core is untouched.
+- **React UI (bonus)** — a second *driving adapter* that POSTs uploaded images or videos to `/v1/detect/upload`; the core is untouched.
 - **Additional engines** — `OnnxInferenceEngine`, Triton, or remote gRPC behind the same port.
 - **Batch / async inference** — a `predict_batch` port method + a worker queue for GPU throughput; the entrypoint returns `202 Accepted` + a job id.
 - **Persistence adapter** — an optional repository (book-style) to store results/audit history, added as another driven adapter without disturbing the core.

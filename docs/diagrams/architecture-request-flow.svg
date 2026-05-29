@@ -29,7 +29,7 @@
   </defs>
 
   <rect x="0" y="0" width="1320" height="1020" fill="#ffffff"/>
-  <text x="660" y="58" text-anchor="middle" class="title">Request Flow: POST /v1/detect</text>
+  <text x="660" y="58" text-anchor="middle" class="title">Request Flow: POST /v1/detect/upload</text>
   <text x="660" y="88" text-anchor="middle" class="subtitle">Printable one-page view of validation, use case orchestration, inference, mapping, and HTTP serialization</text>
 
   <rect x="55" y="125" width="270" height="820" rx="12" class="lane"/>
@@ -121,7 +121,7 @@
   <text x="797" y="298" text-anchor="middle" class="small">The service knows only the port.</text>
   <text x="797" y="318" text-anchor="middle" class="small">YOLO details stay in the adapter.</text>
 
-  <text x="345" y="250" text-anchor="middle" class="tiny">POST /v1/detect</text>
+  <text x="345" y="250" text-anchor="middle" class="tiny">POST /v1/detect/upload</text>
   <text x="655" y="445" text-anchor="middle" class="tiny">valid bytes</text>
   <text x="965" y="636" text-anchor="middle" class="tiny">predict(bytes)</text>
   <text x="815" y="885" text-anchor="middle" class="tiny">InferenceResult</text>

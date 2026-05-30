@@ -35,6 +35,11 @@ type InferredMedia = {
   extension: string;
 };
 
+type MediaDimensions = {
+  width: number;
+  height: number;
+};
+
 type AnalysisState =
   | { kind: "empty" }
   | { kind: "result"; payload: UploadResponse; frames: NormalizedFrame[]; rows: DetectionRow[] }
@@ -61,6 +66,13 @@ const MEDIA_TYPES_BY_EXTENSION: Record<string, string> = {
   mp4: "video/mp4",
   png: "image/png",
   webm: "video/webm",
+};
+
+const FULL_MEDIA_LAYER_STYLE: CSSProperties = {
+  height: "100%",
+  left: 0,
+  top: 0,
+  width: "100%",
 };
 
 export default function Home() {
@@ -263,101 +275,100 @@ export default function Home() {
             <p>Upload-only object detection preview</p>
           </div>
         </div>
-        <div className="endpoint-pill">
-          {API_BASE_URL || "same origin"} /v1/detect/upload
+        <div className="topbar-actions">
+          <div className="endpoint-pill">
+            {API_BASE_URL || "same origin"} /v1/detect/upload
+          </div>
+          <span className={`status-badge ${status.state}`}>{status.label}</span>
         </div>
       </header>
 
-      <div className="workspace">
-        <section className="panel intake-panel" aria-labelledby="upload-title">
+      <div className="editor-workspace">
+        <aside className="sidebar sidebar-left" aria-labelledby="upload-title">
           <div className="panel-heading">
             <div>
               <h2 id="upload-title">Media Intake</h2>
-              <p>Images and sampled videos are analyzed through the FastAPI backend.</p>
+              <p>Choose a file or load a bundled sample.</p>
             </div>
           </div>
 
-          <div
-            className={`dropzone${isDragging ? " dragover" : ""}`}
-            role="button"
-            tabIndex={0}
-            aria-label="Choose or drop media file"
-            onClick={(event) => {
-              if (event.target instanceof HTMLElement && event.target.closest("button")) {
-                return;
-              }
-              openFilePicker();
-            }}
-            onKeyDown={handleDropzoneKeyDown}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_MEDIA}
-              hidden
-              onChange={(event) => {
-                const [file] = event.currentTarget.files ?? [];
-                if (file) {
-                  selectFile(file);
+          <div className="sidebar-scroll">
+            <div
+              className={`dropzone${isDragging ? " dragover" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-label="Choose or drop media file"
+              onClick={(event) => {
+                if (event.target instanceof HTMLElement && event.target.closest("button")) {
+                  return;
                 }
+                openFilePicker();
               }}
-            />
-            <div className="drop-icon" aria-hidden="true" />
-            <h3>Drop media here</h3>
-            <p>JPEG, PNG, MP4, MOV, AVI, or WebM. Default max upload is 20 MB.</p>
-            <button className="button primary" type="button" onClick={openFilePicker}>
-              Choose File
-            </button>
-          </div>
+              onKeyDown={handleDropzoneKeyDown}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_MEDIA}
+                hidden
+                onChange={(event) => {
+                  const [file] = event.currentTarget.files ?? [];
+                  if (file) {
+                    selectFile(file);
+                  }
+                }}
+              />
+              <div className="drop-icon" aria-hidden="true" />
+              <h3>Drop media here</h3>
+              <p>JPEG, PNG, MP4, MOV, AVI, or WebM. Default max upload is 20 MB.</p>
+              <button className="button primary" type="button" onClick={openFilePicker}>
+                Choose File
+              </button>
+            </div>
 
-          <div className="preview-shell" aria-live="polite">
-            <TaggedMediaPreview
-              analysis={analysis}
-              previewUrl={previewUrl}
-              selectedFile={selectedFile}
-            />
-            <div className="file-meta">
-              {selectedFile
-                ? `${selectedFile.name} - ${selectedFile.type || "unknown type"} - ${formatBytes(
-                    selectedFile.size,
-                  )}`
-                : "Select a file to start."}
-            </div>
+            <section className="sample-library" aria-labelledby="samples-title">
+              <div className="section-heading">
+                <h3 id="samples-title">Sample Library</h3>
+                <span>
+                  {samples.length} {samples.length === 1 ? "sample" : "samples"}
+                </span>
+              </div>
+              <div className="sample-list">
+                {samples.length === 0 ? (
+                  <p>No bundled samples were found.</p>
+                ) : (
+                  samples.map((sample) => (
+                    <button
+                      key={sample.id}
+                      className="sample-button"
+                      type="button"
+                      disabled={sampleLoadingId === sample.id}
+                      aria-busy={sampleLoadingId === sample.id}
+                      aria-label={`Load ${sample.label}`}
+                      onClick={() => selectSample(sample)}
+                    >
+                      {sample.thumbnailSrc ? (
+                        <img
+                          className="sample-thumbnail"
+                          src={sample.thumbnailSrc}
+                          alt=""
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="sample-thumbnail sample-thumbnail-empty" aria-hidden="true" />
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
-
-          <section className="sample-library" aria-labelledby="samples-title">
-            <div className="section-heading">
-              <h3 id="samples-title">Sample Library</h3>
-              <span>
-                {samples.length} {samples.length === 1 ? "sample" : "samples"}
-              </span>
-            </div>
-            <div className="sample-list">
-              {samples.length === 0 ? (
-                <p>No bundled samples were found.</p>
-              ) : (
-                samples.map((sample) => (
-                  <button
-                    key={sample.id}
-                    className="sample-button"
-                    type="button"
-                    disabled={sampleLoadingId === sample.id}
-                    aria-busy={sampleLoadingId === sample.id}
-                    onClick={() => selectSample(sample)}
-                  >
-                    <strong>{sample.label}</strong>
-                    <span>{sample.contentType}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
 
           <div className="action-row">
             <button
@@ -377,45 +388,101 @@ export default function Home() {
               Clear
             </button>
           </div>
-        </section>
+        </aside>
 
-        <section className="panel results-panel" aria-labelledby="results-title">
-          <div className="panel-heading results-heading">
+        <section className="viewer-panel" aria-labelledby="viewer-title">
+          <div className="viewer-tabs">
             <div>
-              <h2 id="results-title">Detection Result</h2>
+              <h2 id="viewer-title">Preview</h2>
               <p>{subtitle}</p>
             </div>
-            <span className={`status-badge ${status.state}`}>{status.label}</span>
+            <span className="viewer-tab-active">Media</span>
           </div>
 
-          <div className="metric-grid" aria-label="Detection summary">
-            <MetricTile label="Media" value={metrics.kind} />
-            <MetricTile label="Detections" value={metrics.detections} />
-            <MetricTile label="Avg Inference" value={metrics.latency} />
-            <MetricTile label="Top Label" value={metrics.label} />
+          <div className="viewer-stage" aria-live="polite">
+            <TaggedMediaPreview
+              analysis={analysis}
+              previewUrl={previewUrl}
+              selectedFile={selectedFile}
+            />
           </div>
 
-          {analysis.kind === "result" ? (
-            <ResultContent analysis={analysis} />
-          ) : (
-            <div className="empty-state">
-              {analysis.kind === "error" ? (
-                <>
-                  <h3>Analysis failed</h3>
-                  <p className="error-text">{analysis.message}</p>
-                </>
-              ) : (
-                <>
-                  <h3>Ready for analysis</h3>
-                  <p>
-                    Upload a still image or video to see detection labels,
-                    confidence scores, bounding box data, and sampled frame timing.
-                  </p>
-                </>
-              )}
+          <div className="viewer-footer">
+            <div className="file-meta">
+              {selectedFile
+                ? `${selectedFile.name} - ${selectedFile.type || "unknown type"} - ${formatBytes(
+                    selectedFile.size,
+                  )}`
+                : "Select a file to start."}
             </div>
-          )}
+          </div>
         </section>
+
+        <aside className="sidebar sidebar-right" aria-labelledby="results-title">
+          <div className="panel-heading results-heading">
+            <div>
+              <h2 id="results-title">Inspector</h2>
+              <p>Media details and detection output.</p>
+            </div>
+          </div>
+
+          <div className="sidebar-scroll">
+            <section className="inspector-section" aria-labelledby="details-title">
+              <div className="section-heading">
+                <h3 id="details-title">Description</h3>
+              </div>
+              <div className="detail-list">
+                <div>
+                  <span>File</span>
+                  <strong>{selectedFile?.name ?? "None selected"}</strong>
+                </div>
+                <div>
+                  <span>Type</span>
+                  <strong>{selectedFile?.type || "Unknown"}</strong>
+                </div>
+                <div>
+                  <span>Size</span>
+                  <strong>{selectedFile ? formatBytes(selectedFile.size) : "-"}</strong>
+                </div>
+              </div>
+            </section>
+
+            <section className="inspector-section" aria-labelledby="summary-title">
+              <div className="section-heading">
+                <h3 id="summary-title">Summary</h3>
+              </div>
+              <div className="metric-grid" aria-label="Detection summary">
+                <MetricTile label="Media" value={metrics.kind} />
+                <MetricTile label="Detections" value={metrics.detections} />
+                <MetricTile label="Avg Inference" value={metrics.latency} />
+                <MetricTile label="Top Label" value={metrics.label} />
+              </div>
+            </section>
+
+            <section className="inspector-section inspector-results" aria-label="Detection result">
+              {analysis.kind === "result" ? (
+                <ResultContent analysis={analysis} />
+              ) : (
+                <div className="empty-state">
+                  {analysis.kind === "error" ? (
+                    <>
+                      <h3>Analysis failed</h3>
+                      <p className="error-text">{analysis.message}</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3>Ready for analysis</h3>
+                      <p>
+                        Upload a still image or video to see detection labels,
+                        confidence scores, bounding box data, and sampled frame timing.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
+        </aside>
       </div>
     </main>
   );
@@ -430,10 +497,16 @@ function TaggedMediaPreview({
   previewUrl: string | null;
   selectedFile: File | null;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [mediaDimensions, setMediaDimensions] = useState<MediaDimensions | null>(null);
   const [videoPreviewFailed, setVideoPreviewFailed] = useState(false);
   const inferred = selectedFile ? inferMedia(selectedFile) : null;
   const mediaKind = inferred?.kind ?? "unknown";
+  const previewStyle: CSSProperties | undefined = mediaDimensions
+    ? { aspectRatio: `${mediaDimensions.width} / ${mediaDimensions.height}` }
+    : undefined;
   const overlayFrame =
     analysis.kind === "result"
       ? analysis.payload.kind === "video"
@@ -443,8 +516,51 @@ function TaggedMediaPreview({
 
   useEffect(() => {
     setCurrentTime(0);
+    setMediaDimensions(null);
     setVideoPreviewFailed(false);
+    stopFrameTracking();
   }, [previewUrl]);
+
+  useEffect(() => {
+    return () => stopFrameTracking();
+  }, []);
+
+  function syncCurrentTime() {
+    const video = videoRef.current;
+    if (video) {
+      setCurrentTime(video.currentTime);
+    }
+  }
+
+  function stopFrameTracking() {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }
+
+  function trackPlaybackFrame() {
+    syncCurrentTime();
+
+    const video = videoRef.current;
+    if (video && !video.paused && !video.ended) {
+      animationFrameRef.current = window.requestAnimationFrame(trackPlaybackFrame);
+      return;
+    }
+
+    animationFrameRef.current = null;
+  }
+
+  function startFrameTracking() {
+    stopFrameTracking();
+    animationFrameRef.current = window.requestAnimationFrame(trackPlaybackFrame);
+  }
+
+  function updateMediaDimensions(width: number, height: number) {
+    if (width > 0 && height > 0) {
+      setMediaDimensions({ width, height });
+    }
+  }
 
   if (!selectedFile || !previewUrl) {
     return (
@@ -458,15 +574,31 @@ function TaggedMediaPreview({
     const isAvi = inferred?.extension === "avi";
 
     return (
-      <div className="media-preview media-stage">
+      <div className="media-preview media-stage" style={previewStyle}>
         <video
+          ref={videoRef}
           key={previewUrl}
           controls
+          loop
           muted
           playsInline
           onError={() => setVideoPreviewFailed(true)}
           onLoadedData={() => setVideoPreviewFailed(false)}
-          onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+          onLoadedMetadata={(event) => {
+            syncCurrentTime();
+            updateMediaDimensions(
+              event.currentTarget.videoWidth,
+              event.currentTarget.videoHeight,
+            );
+          }}
+          onPause={() => {
+            syncCurrentTime();
+            stopFrameTracking();
+          }}
+          onPlay={startFrameTracking}
+          onSeeked={syncCurrentTime}
+          onSeeking={syncCurrentTime}
+          onTimeUpdate={syncCurrentTime}
         >
           <source src={previewUrl} type={selectedFile.type || inferred?.contentType} />
           Preview is unavailable for this video format.
@@ -485,8 +617,17 @@ function TaggedMediaPreview({
 
   if (mediaKind === "image") {
     return (
-      <div className="media-preview media-stage">
-        <img src={previewUrl} alt={`Preview of ${selectedFile.name}`} />
+      <div className="media-preview media-stage" style={previewStyle}>
+        <img
+          src={previewUrl}
+          alt={`Preview of ${selectedFile.name}`}
+          onLoad={(event) =>
+            updateMediaDimensions(
+              event.currentTarget.naturalWidth,
+              event.currentTarget.naturalHeight,
+            )
+          }
+        />
         <DetectionOverlay frame={overlayFrame} />
       </div>
     );
@@ -543,7 +684,7 @@ function DetectionOverlay({ frame }: { frame?: NormalizedFrame }) {
   }
 
   return (
-    <div className="detection-layer" style={overlayLayerStyle(width, height)}>
+    <div className="detection-layer" style={FULL_MEDIA_LAYER_STYLE}>
       {frame.result.detections.map((detection, index) => (
         <div
           className="detection-box"
@@ -572,29 +713,6 @@ function frameForPlaybackTime(frames: NormalizedFrame[], currentTime: number) {
     activeFrame = frame;
   }
   return activeFrame;
-}
-
-function overlayLayerStyle(width: number, height: number): CSSProperties {
-  const mediaRatio = width / height;
-  const stageRatio = 16 / 9;
-
-  if (mediaRatio > stageRatio) {
-    const scaledHeight = (stageRatio / mediaRatio) * 100;
-    return {
-      height: `${scaledHeight}%`,
-      left: 0,
-      top: `${(100 - scaledHeight) / 2}%`,
-      width: "100%",
-    };
-  }
-
-  const scaledWidth = (mediaRatio / stageRatio) * 100;
-  return {
-    height: "100%",
-    left: `${(100 - scaledWidth) / 2}%`,
-    top: 0,
-    width: `${scaledWidth}%`,
-  };
 }
 
 function boxStyle(

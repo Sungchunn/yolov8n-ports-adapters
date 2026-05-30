@@ -1,13 +1,20 @@
 # Demo Assets
 
-The videos in `videos/` are synthetic clips generated for the demo. They are not
-copied from traffic-camera footage or any third-party dataset, so they are safe to
-redistribute with this repository.
+`videos.json` is the stable manifest for the frontend sample library. Add new demo
+videos there instead of relying on filesystem directory listing.
 
-`videos.json` is the stable manifest for a frontend random-rotator control. Add new
-demo videos there instead of relying on filesystem directory listing.
+Generate TrafficDB demo clips from local AVI files with:
 
-Regenerate the clips with:
+```bash
+python3 backend/scripts/convert_trafficdb_demo_videos.py
+```
+
+The script randomly samples 10 AVI files from `assets/video/`, converts them to
+browser-friendly MP4 files in `videos/`, and rewrites `videos.json`. The default
+seed is fixed so repeated runs are reproducible; pass `--seed` to rotate the
+sample set.
+
+The older synthetic clip generator is still available for fallback assets:
 
 ```bash
 python3 backend/scripts/generate_demo_videos.py

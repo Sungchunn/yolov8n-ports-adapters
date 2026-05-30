@@ -1,20 +1,62 @@
 [
   {
-    "id": "synthetic-light",
-    "label": "Synthetic light traffic",
-    "src": "/assets/demo/videos/synthetic-light.mp4",
+    "id": "trafficdb-demo-01",
+    "label": "TrafficDB sample 01 (cctv052x2004080519x01691)",
+    "src": "/assets/demo/videos/trafficdb-demo-01.mp4",
     "contentType": "video/mp4"
   },
   {
-    "id": "synthetic-medium",
-    "label": "Synthetic medium traffic",
-    "src": "/assets/demo/videos/synthetic-medium.mp4",
+    "id": "trafficdb-demo-02",
+    "label": "TrafficDB sample 02 (cctv052x2004080612x01911)",
+    "src": "/assets/demo/videos/trafficdb-demo-02.mp4",
     "contentType": "video/mp4"
   },
   {
-    "id": "synthetic-heavy",
-    "label": "Synthetic heavy traffic",
-    "src": "/assets/demo/videos/synthetic-heavy.mp4",
+    "id": "trafficdb-demo-03",
+    "label": "TrafficDB sample 03 (cctv052x2004080614x00021)",
+    "src": "/assets/demo/videos/trafficdb-demo-03.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-04",
+    "label": "TrafficDB sample 04 (cctv052x2004080606x01826)",
+    "src": "/assets/demo/videos/trafficdb-demo-04.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-05",
+    "label": "TrafficDB sample 05 (cctv052x2004080617x00072)",
+    "src": "/assets/demo/videos/trafficdb-demo-05.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-06",
+    "label": "TrafficDB sample 06 (cctv052x2004080607x01839)",
+    "src": "/assets/demo/videos/trafficdb-demo-06.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-07",
+    "label": "TrafficDB sample 07 (cctv052x2004080609x01860)",
+    "src": "/assets/demo/videos/trafficdb-demo-07.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-08",
+    "label": "TrafficDB sample 08 (cctv052x2004080610x01878)",
+    "src": "/assets/demo/videos/trafficdb-demo-08.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-09",
+    "label": "TrafficDB sample 09 (cctv052x2004080612x01908)",
+    "src": "/assets/demo/videos/trafficdb-demo-09.mp4",
+    "contentType": "video/mp4"
+  },
+  {
+    "id": "trafficdb-demo-10",
+    "label": "TrafficDB sample 10 (cctv052x2004080608x01850)",
+    "src": "/assets/demo/videos/trafficdb-demo-10.mp4",
     "contentType": "video/mp4"
   }
 ]

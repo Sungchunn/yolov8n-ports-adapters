@@ -98,12 +98,12 @@ class FakeMediaProcessor(AbstractMediaProcessor):
                         image_bytes=b"frame-0",
                     ),
                     MediaFrame(
-                        frame_index=30,
-                        timestamp_seconds=1.0,
+                        frame_index=8,
+                        timestamp_seconds=0.25,
                         image_bytes=b"frame-1",
                     ),
                 ),
-                sample_interval_seconds=1.0,
+                sample_interval_seconds=0.25,
             )
         raise UnsupportedMediaTypeError(f"unsupported media type: {content_type}")
 

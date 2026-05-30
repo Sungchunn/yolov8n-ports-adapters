@@ -97,7 +97,8 @@ curl -X POST http://localhost:8000/v1/detect/upload \
 
 Supported image types are JPEG and PNG. Supported video types are MP4,
 MOV/QuickTime, AVI, and WebM. Videos are sampled at
-`VIDEO_SAMPLE_INTERVAL_SECONDS` and capped by `MAX_VIDEO_FRAMES`.
+`VIDEO_SAMPLE_INTERVAL_SECONDS` and capped by `MAX_VIDEO_FRAMES`. Defaults are
+0.25 seconds between samples and 120 sampled frames.
 
 Image responses are shaped as:
 
@@ -119,7 +120,7 @@ Video responses contain sampled frame results:
 ```json
 {
   "kind": "video",
-  "sample_interval_seconds": 1.0,
+  "sample_interval_seconds": 0.25,
   "frames": [
     {
       "model": "yolov8n",

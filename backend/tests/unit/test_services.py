@@ -45,8 +45,8 @@ def test_detect_media_processes_each_video_frame() -> None:
     result = detect_media(b"video bytes", "video/x-msvideo", engine, media_processor)
 
     assert result.kind == MediaKind.VIDEO
-    assert result.sample_interval_seconds == 1.0
-    assert [frame.frame_index for frame in result.frames] == [0, 30]
+    assert result.sample_interval_seconds == 0.25
+    assert [frame.frame_index for frame in result.frames] == [0, 8]
     assert engine.calls == [b"frame-0", b"frame-1"]
 
 

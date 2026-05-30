@@ -69,9 +69,9 @@ def test_upload_avi_returns_per_frame_detection_results(
     assert response.status_code == 200
     payload = response.json()
     assert payload["kind"] == "video"
-    assert payload["sample_interval_seconds"] == 1.0
-    assert [frame["frame_index"] for frame in payload["frames"]] == [0, 30]
-    assert [frame["timestamp_seconds"] for frame in payload["frames"]] == [0.0, 1.0]
+    assert payload["sample_interval_seconds"] == 0.25
+    assert [frame["frame_index"] for frame in payload["frames"]] == [0, 8]
+    assert [frame["timestamp_seconds"] for frame in payload["frames"]] == [0.0, 0.25]
     assert fake_engine.calls == [b"frame-0", b"frame-1"]
     assert fake_media_processor.calls == [(b"video bytes", "video/x-msvideo")]
 

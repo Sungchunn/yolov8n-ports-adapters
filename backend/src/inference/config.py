@@ -27,9 +27,9 @@ class Settings:
     confidence_threshold: float = _float_from_env("CONFIDENCE_THRESHOLD", 0.25)
     max_upload_bytes: int = _int_from_env("MAX_UPLOAD_BYTES", 20 * 1024 * 1024)
     video_sample_interval_seconds: float = _float_from_env(
-        "VIDEO_SAMPLE_INTERVAL_SECONDS", 1.0
+        "VIDEO_SAMPLE_INTERVAL_SECONDS", 0.25
     )
-    max_video_frames: int = _int_from_env("MAX_VIDEO_FRAMES", 60)
+    max_video_frames: int = _int_from_env("MAX_VIDEO_FRAMES", 120)
     cors_origins: tuple[str, ...] = _list_from_env(
         "CORS_ORIGINS",
         ("http://localhost:3000", "http://127.0.0.1:3000"),

@@ -14,6 +14,13 @@ def _int_from_env(name: str, default: int) -> int:
     return default if value is None else int(value)
 
 
+def _list_from_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     model_path: str = os.getenv("MODEL_PATH", "models/yolov8n.pt")
@@ -23,6 +30,10 @@ class Settings:
         "VIDEO_SAMPLE_INTERVAL_SECONDS", 1.0
     )
     max_video_frames: int = _int_from_env("MAX_VIDEO_FRAMES", 60)
+    cors_origins: tuple[str, ...] = _list_from_env(
+        "CORS_ORIGINS",
+        ("http://localhost:3000", "http://127.0.0.1:3000"),
+    )
 
 
 def get_settings() -> Settings:

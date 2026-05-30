@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from inference.bootstrap import bootstrap
 from inference.config import Settings, get_settings
@@ -19,10 +18,6 @@ from inference.domain.exceptions import (
 )
 from inference.entrypoints.routes import create_router
 from inference.service_layer.ports import AbstractInferenceEngine, AbstractMediaProcessor
-
-
-STATIC_DIR = Path(__file__).with_name("static")
-ASSETS_DIR = Path(__file__).resolve().parents[3] / "assets"
 
 
 def create_app(
@@ -42,24 +37,28 @@ def create_app(
         yield
 
     app = FastAPI(title="Vision Inference API", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(resolved_settings.cors_origins),
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
     if engine is not None:
         app.state.inference_engine = engine
     if media_processor is not None:
         app.state.media_processor = media_processor
 
     app.include_router(create_router(resolved_settings))
-    _register_frontend(app)
+    _register_health_check(app)
     _register_exception_handlers(app)
     return app
 
 
-def _register_frontend(app: FastAPI) -> None:
-    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-    @app.get("/", include_in_schema=False)
-    async def frontend_index() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
+def _register_health_check(app: FastAPI) -> None:
+    @app.get("/health", include_in_schema=False)
+    async def health_check() -> dict[str, str]:
+        return {"status": "ok"}
 
 
 def _register_exception_handlers(app: FastAPI) -> None:

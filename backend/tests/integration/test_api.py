@@ -10,19 +10,17 @@ from tests.conftest import (
 )
 
 
-def test_frontend_index_is_served(client: TestClient) -> None:
+def test_health_check_returns_ok(client: TestClient) -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_root_is_not_backend_owned(client: TestClient) -> None:
     response = client.get("/")
 
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "Vision Inference" in response.text
-
-
-def test_asset_manifest_is_served(client: TestClient) -> None:
-    response = client.get("/assets/video/videos.json")
-
-    assert response.status_code == 200
-    assert response.json()[0]["contentType"] == "video/x-msvideo"
+    assert response.status_code == 404
 
 
 def test_upload_jpeg_returns_image_detection_response(

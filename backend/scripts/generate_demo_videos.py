@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-OUT_DIR = ROOT / "assets" / "demo" / "videos"
+ROOT = Path(__file__).resolve().parents[2]
+OUT_DIR = ROOT / "frontend" / "public" / "assets" / "demo" / "videos"
 WIDTH = 640
 HEIGHT = 360
 FPS = 24

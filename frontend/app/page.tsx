@@ -16,12 +16,10 @@ import {
   SampleMedia,
   UploadResponse,
   average,
-  fileWithInferredType,
   formatBox,
   formatBytes,
   formatNumber,
   formatPercent,
-  inferMedia,
   mostCommonLabel,
   normalizeFrames,
   rowsFromFrames,
@@ -29,6 +27,13 @@ import {
 } from "@/lib/api";
 
 type StatusState = "idle" | "ready" | "loading" | "success" | "error";
+type MediaKind = "image" | "video" | "unknown";
+
+type InferredMedia = {
+  kind: MediaKind;
+  contentType: string;
+  extension: string;
+};
 
 type AnalysisState =
   | { kind: "empty" }
@@ -37,6 +42,26 @@ type AnalysisState =
 
 const ACCEPTED_MEDIA =
   ".jpg,.jpeg,.png,.mp4,.mov,.avi,.webm,image/jpeg,image/jpg,image/png,video/mp4,video/quicktime,video/x-msvideo,video/webm";
+
+const SUPPORTED_MEDIA_TYPES: Record<string, MediaKind> = {
+  "image/jpeg": "image",
+  "image/jpg": "image",
+  "image/png": "image",
+  "video/mp4": "video",
+  "video/quicktime": "video",
+  "video/x-msvideo": "video",
+  "video/webm": "video",
+};
+
+const MEDIA_TYPES_BY_EXTENSION: Record<string, string> = {
+  avi: "video/x-msvideo",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  mov: "video/quicktime",
+  mp4: "video/mp4",
+  png: "image/png",
+  webm: "video/webm",
+};
 
 export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -435,6 +460,7 @@ function TaggedMediaPreview({
     return (
       <div className="media-preview media-stage">
         <video
+          key={previewUrl}
           controls
           muted
           playsInline
@@ -471,6 +497,39 @@ function TaggedMediaPreview({
       <span>Preview unavailable for this file type</span>
     </div>
   );
+}
+
+function inferMedia(file: Pick<File, "name" | "type">): InferredMedia {
+  const normalizedType = file.type.toLowerCase();
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const extensionType = MEDIA_TYPES_BY_EXTENSION[extension] ?? "";
+  const canonicalType = normalizedType === "image/jpg" ? "image/jpeg" : normalizedType;
+  const contentType =
+    canonicalType && SUPPORTED_MEDIA_TYPES[canonicalType]
+      ? canonicalType
+      : extensionType || canonicalType;
+
+  return {
+    kind: SUPPORTED_MEDIA_TYPES[contentType] ?? "unknown",
+    contentType,
+    extension,
+  };
+}
+
+function fileWithInferredType(file: File): File {
+  const inferred = inferMedia(file);
+  if (
+    !inferred.contentType ||
+    inferred.contentType === file.type ||
+    inferred.kind === "unknown"
+  ) {
+    return file;
+  }
+
+  return new File([file], file.name, {
+    lastModified: file.lastModified,
+    type: inferred.contentType,
+  });
 }
 
 function DetectionOverlay({ frame }: { frame?: NormalizedFrame }) {

@@ -13,7 +13,6 @@ from inference.service_layer.services import detect_media
 def create_router(settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/v1/detect")
 
-    @router.post("/upload", response_model=UploadResponse)
     async def detect_upload(
         request: Request, file: Annotated[UploadFile, File(...)]
     ) -> UploadResponse:
@@ -29,6 +28,12 @@ def create_router(settings: Settings) -> APIRouter:
         )
         return media_detection_to_response(result)
 
+    router.add_api_route(
+        "/upload",
+        detect_upload,
+        methods=["POST"],
+        response_model=UploadResponse,
+    )
     return router
 
 

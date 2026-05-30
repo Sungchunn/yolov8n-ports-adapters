@@ -6,25 +6,25 @@ import os
 import tempfile
 from typing import Any, Callable, Iterator, Protocol, cast
 
-from inference.domain.exceptions import (
+from inference.domain.model import MediaFrame, MediaKind, ProcessedMedia
+from inference.service_layer.errors import (
     InferenceError,
     InvalidImageError,
     InvalidVideoError,
     UnsupportedMediaTypeError,
 )
-from inference.domain.model import MediaFrame, MediaKind, ProcessedMedia
+from inference.service_layer.media import MediaFormat
 from inference.service_layer.ports import AbstractMediaProcessor
 
-IMAGE_CONTENT_TYPES = {
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
+IMAGE_FORMATS = {
+    MediaFormat.JPEG,
+    MediaFormat.PNG,
 }
-VIDEO_CONTENT_TYPES = {
-    "video/mp4": ".mp4",
-    "video/quicktime": ".mov",
-    "video/x-msvideo": ".avi",
-    "video/webm": ".webm",
+VIDEO_SUFFIXES = {
+    MediaFormat.MP4: ".mp4",
+    MediaFormat.QUICKTIME: ".mov",
+    MediaFormat.AVI: ".avi",
+    MediaFormat.WEBM: ".webm",
 }
 
 
@@ -73,21 +73,21 @@ class OpenCvMediaProcessor(AbstractMediaProcessor):
         self.sample_interval_seconds = sample_interval_seconds
         self.max_video_frames = max_video_frames
 
-    def process(self, media_bytes: bytes, content_type: str) -> ProcessedMedia:
+    def process(self, media_bytes: bytes, media_format: MediaFormat) -> ProcessedMedia:
         if not media_bytes:
             raise InvalidImageError("media payload must not be empty")
-        if content_type in IMAGE_CONTENT_TYPES:
-            self._validate_image(media_bytes, content_type)
+        if media_format in IMAGE_FORMATS:
+            self._validate_image(media_bytes, media_format)
             return ProcessedMedia(
                 kind=MediaKind.IMAGE,
                 frames=(MediaFrame(frame_index=0, timestamp_seconds=None, image_bytes=media_bytes),),
             )
-        if content_type in VIDEO_CONTENT_TYPES:
+        if media_format in VIDEO_SUFFIXES:
             frames = sample_video_bytes(
                 media_bytes,
                 sample_interval_seconds=self.sample_interval_seconds,
                 max_frames=self.max_video_frames,
-                suffix=VIDEO_CONTENT_TYPES[content_type],
+                suffix=VIDEO_SUFFIXES[media_format],
             )
             return ProcessedMedia(
                 kind=MediaKind.VIDEO,
@@ -101,18 +101,18 @@ class OpenCvMediaProcessor(AbstractMediaProcessor):
                 ),
                 sample_interval_seconds=self.sample_interval_seconds,
             )
-        raise UnsupportedMediaTypeError(f"unsupported media type: {content_type}")
+        raise UnsupportedMediaTypeError(f"unsupported media format: {media_format}")
 
-    def _validate_image(self, media_bytes: bytes, content_type: str) -> None:
-        if content_type in {"image/jpeg", "image/jpg"}:
+    def _validate_image(self, media_bytes: bytes, media_format: MediaFormat) -> None:
+        if media_format == MediaFormat.JPEG:
             if not media_bytes.startswith(b"\xff\xd8\xff"):
                 raise InvalidImageError("upload payload is not a JPEG image")
             return
-        if content_type == "image/png":
+        if media_format == MediaFormat.PNG:
             if not media_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise InvalidImageError("upload payload is not a PNG image")
             return
-        raise UnsupportedMediaTypeError(f"unsupported image media type: {content_type}")
+        raise UnsupportedMediaTypeError(f"unsupported image media format: {media_format}")
 
 
 def open_capture(source: int | str) -> CaptureLike:

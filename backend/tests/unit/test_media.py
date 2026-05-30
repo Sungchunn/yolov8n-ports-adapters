@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import cast
 
 import pytest
 
 from inference.adapters.media import OpenCvMediaProcessor, SampledFrame, sample_video_capture
-from inference.domain.exceptions import InvalidImageError, UnsupportedMediaTypeError
+from inference.adapters.inference import YoloInferenceEngine
 from inference.domain.model import MediaKind
-from tests.conftest import SAMPLE_JPEG_BYTES, SAMPLE_PNG_BYTES
+from inference.service_layer.errors import InvalidImageError, UnsupportedMediaTypeError
+from inference.service_layer.media import MediaFormat
+from tests.support import SAMPLE_JPEG_BYTES, SAMPLE_PNG_BYTES
 
 
 class FakeCapture:
@@ -32,6 +35,31 @@ class FakeCapture:
         return None
 
 
+class FakeTensor:
+    def __init__(self, values: list[object]) -> None:
+        self.values = values
+
+    def cpu(self) -> FakeTensor:
+        return self
+
+    def tolist(self) -> list[object]:
+        return self.values
+
+
+class FakeBoxes:
+    xyxy = FakeTensor([[1, 2, 11, 22]])
+    conf = FakeTensor([0.9])
+    cls = FakeTensor([0])
+
+    def __len__(self) -> int:
+        return 1
+
+
+class FakeYoloResult:
+    boxes = FakeBoxes()
+    names = {0: "person"}
+
+
 def test_sample_video_capture_uses_interval_and_max_frames() -> None:
     capture = FakeCapture(["a", "b", "c", "d", "e", "f"])
 
@@ -50,10 +78,27 @@ def test_sample_video_capture_uses_interval_and_max_frames() -> None:
     assert [frame.image_bytes for frame in frames] == [b"jpeg-a", b"jpeg-c"]
 
 
+def test_yolo_adapter_maps_raw_result_to_domain_detection() -> None:
+    engine = object.__new__(YoloInferenceEngine)
+    engine._model = object()
+
+    detections = engine._map_result(FakeYoloResult())
+
+    assert len(detections) == 1
+    detection = detections[0]
+    assert detection.label.class_id == 0
+    assert detection.label.name == "person"
+    assert detection.confidence == 0.9
+    assert detection.box.x1 == 1.0
+    assert detection.box.y1 == 2.0
+    assert detection.box.x2 == 11.0
+    assert detection.box.y2 == 22.0
+
+
 def test_media_processor_accepts_jpeg_image() -> None:
     processor = OpenCvMediaProcessor(sample_interval_seconds=1.0, max_video_frames=60)
 
-    media = processor.process(SAMPLE_JPEG_BYTES, "image/jpeg")
+    media = processor.process(SAMPLE_JPEG_BYTES, MediaFormat.JPEG)
 
     assert media.kind == MediaKind.IMAGE
     assert media.frames[0].image_bytes == SAMPLE_JPEG_BYTES
@@ -62,7 +107,7 @@ def test_media_processor_accepts_jpeg_image() -> None:
 def test_media_processor_accepts_png_image() -> None:
     processor = OpenCvMediaProcessor(sample_interval_seconds=1.0, max_video_frames=60)
 
-    media = processor.process(SAMPLE_PNG_BYTES, "image/png")
+    media = processor.process(SAMPLE_PNG_BYTES, MediaFormat.PNG)
 
     assert media.kind == MediaKind.IMAGE
     assert media.frames[0].image_bytes == SAMPLE_PNG_BYTES
@@ -72,7 +117,7 @@ def test_media_processor_rejects_invalid_image_magic() -> None:
     processor = OpenCvMediaProcessor(sample_interval_seconds=1.0, max_video_frames=60)
 
     with pytest.raises(InvalidImageError):
-        processor.process(b"not a png", "image/png")
+        processor.process(b"not a png", MediaFormat.PNG)
 
 
 def test_media_processor_dispatches_avi_to_video_sampler(
@@ -98,7 +143,7 @@ def test_media_processor_dispatches_avi_to_video_sampler(
     )
     processor = OpenCvMediaProcessor(sample_interval_seconds=0.5, max_video_frames=2)
 
-    media = processor.process(b"avi bytes", "video/x-msvideo")
+    media = processor.process(b"avi bytes", MediaFormat.AVI)
 
     assert media.kind == MediaKind.VIDEO
     assert media.sample_interval_seconds == 0.5
@@ -109,4 +154,4 @@ def test_media_processor_rejects_unsupported_media_type() -> None:
     processor = OpenCvMediaProcessor(sample_interval_seconds=1.0, max_video_frames=60)
 
     with pytest.raises(UnsupportedMediaTypeError):
-        processor.process(b"hello", "text/plain")
+        processor.process(b"hello", cast(MediaFormat, "text"))

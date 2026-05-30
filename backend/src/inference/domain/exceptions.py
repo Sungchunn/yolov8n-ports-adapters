@@ -2,19 +2,7 @@ from __future__ import annotations
 
 
 class DomainError(Exception):
-    """Base exception for framework-free domain/application failures."""
-
-
-class InvalidImageError(DomainError):
-    """Raised when image bytes cannot be decoded for inference."""
-
-
-class InvalidVideoError(DomainError):
-    """Raised when video bytes cannot be decoded or sampled."""
-
-
-class UnsupportedMediaTypeError(DomainError):
-    """Raised when uploaded media has no supported processing adapter."""
+    """Base exception for framework-free domain failures."""
 
 
 class InvalidBoundingBox(DomainError):
@@ -23,7 +11,3 @@ class InvalidBoundingBox(DomainError):
 
 class InvalidDetection(DomainError):
     """Raised when a detection value object violates invariants."""
-
-
-class InferenceError(DomainError):
-    """Raised when the concrete inference runtime fails."""

@@ -6,8 +6,20 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from inference.config import Settings
 from inference.entrypoints.schemas import UploadResponse, media_detection_to_response
+from inference.service_layer.errors import UnsupportedMediaTypeError
+from inference.service_layer.media import MediaFormat
 from inference.service_layer.ports import AbstractInferenceEngine, AbstractMediaProcessor
 from inference.service_layer.services import detect_media
+
+CONTENT_TYPE_TO_MEDIA_FORMAT = {
+    "image/jpeg": MediaFormat.JPEG,
+    "image/jpg": MediaFormat.JPEG,
+    "image/png": MediaFormat.PNG,
+    "video/mp4": MediaFormat.MP4,
+    "video/quicktime": MediaFormat.QUICKTIME,
+    "video/x-msvideo": MediaFormat.AVI,
+    "video/webm": MediaFormat.WEBM,
+}
 
 
 def create_router(settings: Settings) -> APIRouter:
@@ -22,7 +34,7 @@ def create_router(settings: Settings) -> APIRouter:
         )
         result = detect_media(
             media_bytes=media_bytes,
-            content_type=file.content_type or "",
+            media_format=_media_format_from_content_type(file.content_type),
             inference_engine=_get_inference_engine(request),
             media_processor=_get_media_processor(request),
         )
@@ -47,6 +59,16 @@ async def _read_upload(
     if len(payload) > max_bytes:
         raise HTTPException(status_code=413, detail="upload payload is too large")
     return payload
+
+
+def _media_format_from_content_type(content_type: str | None) -> MediaFormat:
+    normalized = (content_type or "").split(";", maxsplit=1)[0].strip().lower()
+    try:
+        return CONTENT_TYPE_TO_MEDIA_FORMAT[normalized]
+    except KeyError as exc:
+        raise UnsupportedMediaTypeError(
+            f"unsupported media type: {content_type or 'unknown'}"
+        ) from exc
 
 
 def _get_inference_engine(request: Request) -> AbstractInferenceEngine:

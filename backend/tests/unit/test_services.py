@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from inference.domain.exceptions import InvalidImageError
 from inference.domain.model import MediaKind
+from inference.service_layer.errors import InvalidImageError
+from inference.service_layer.media import MediaFormat
 from inference.service_layer.services import detect_media, detect_objects
-from tests.conftest import FakeInferenceEngine, FakeMediaProcessor
+from tests.support import FakeInferenceEngine, FakeMediaProcessor
 
 
 def test_detect_objects_delegates_to_inference_port() -> None:
@@ -30,19 +31,19 @@ def test_detect_media_processes_image_before_inference() -> None:
     engine = FakeInferenceEngine()
     media_processor = FakeMediaProcessor()
 
-    result = detect_media(b"jpeg bytes", "image/jpeg", engine, media_processor)
+    result = detect_media(b"jpeg bytes", MediaFormat.JPEG, engine, media_processor)
 
     assert result.kind == MediaKind.IMAGE
     assert len(result.frames) == 1
     assert engine.calls == [b"jpeg bytes"]
-    assert media_processor.calls == [(b"jpeg bytes", "image/jpeg")]
+    assert media_processor.calls == [(b"jpeg bytes", MediaFormat.JPEG)]
 
 
 def test_detect_media_processes_each_video_frame() -> None:
     engine = FakeInferenceEngine()
     media_processor = FakeMediaProcessor()
 
-    result = detect_media(b"video bytes", "video/x-msvideo", engine, media_processor)
+    result = detect_media(b"video bytes", MediaFormat.AVI, engine, media_processor)
 
     assert result.kind == MediaKind.VIDEO
     assert result.sample_interval_seconds == 0.25
@@ -55,7 +56,7 @@ def test_detect_media_rejects_empty_payload_before_media_processor_call() -> Non
     media_processor = FakeMediaProcessor()
 
     with pytest.raises(InvalidImageError):
-        detect_media(b"", "image/jpeg", engine, media_processor)
+        detect_media(b"", MediaFormat.JPEG, engine, media_processor)
 
     assert engine.calls == []
     assert media_processor.calls == []

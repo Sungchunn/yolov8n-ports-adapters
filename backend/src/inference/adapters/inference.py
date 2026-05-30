@@ -5,8 +5,8 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from inference.domain.exceptions import InferenceError, InvalidImageError
 from inference.domain.model import BoundingBox, Detection, DetectionLabel, InferenceResult
+from inference.service_layer.errors import InferenceError, InvalidImageError
 from inference.service_layer.ports import AbstractInferenceEngine
 
 

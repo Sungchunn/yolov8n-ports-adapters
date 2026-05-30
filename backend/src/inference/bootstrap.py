@@ -17,12 +17,20 @@ class AppDependencies:
 def bootstrap(settings: Settings | None = None) -> AppDependencies:
     resolved = settings or get_settings()
     return AppDependencies(
-        inference_engine=YoloInferenceEngine(
-            model_path=resolved.model_path,
-            confidence_threshold=resolved.confidence_threshold,
-        ),
-        media_processor=OpenCvMediaProcessor(
-            sample_interval_seconds=resolved.video_sample_interval_seconds,
-            max_video_frames=resolved.max_video_frames,
-        ),
+        inference_engine=create_inference_engine(resolved),
+        media_processor=create_media_processor(resolved),
+    )
+
+
+def create_inference_engine(settings: Settings) -> AbstractInferenceEngine:
+    return YoloInferenceEngine(
+        model_path=settings.model_path,
+        confidence_threshold=settings.confidence_threshold,
+    )
+
+
+def create_media_processor(settings: Settings) -> AbstractMediaProcessor:
+    return OpenCvMediaProcessor(
+        sample_interval_seconds=settings.video_sample_interval_seconds,
+        max_video_frames=settings.max_video_frames,
     )

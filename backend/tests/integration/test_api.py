@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from typing import NoReturn
+
+import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import (
+from inference.config import Settings
+from inference.entrypoints.app import create_app
+from inference.service_layer.media import MediaFormat
+from tests.support import (
     SAMPLE_JPEG_BYTES,
     SAMPLE_PNG_BYTES,
     FakeInferenceEngine,
@@ -15,6 +21,26 @@ def test_health_check_returns_ok(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_custom_engine_does_not_construct_default_engine(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_engine: FakeInferenceEngine,
+    settings: Settings,
+) -> None:
+    def fail_create_inference_engine(_settings: Settings) -> NoReturn:
+        raise AssertionError("default inference engine should not be constructed")
+
+    monkeypatch.setattr(
+        "inference.entrypoints.app.create_inference_engine",
+        fail_create_inference_engine,
+    )
+    app = create_app(engine=fake_engine, settings=settings)
+
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
 
 
 def test_root_is_not_backend_owned(client: TestClient) -> None:
@@ -43,7 +69,7 @@ def test_upload_jpeg_returns_image_detection_response(
         "name": "person",
     }
     assert fake_engine.calls == [SAMPLE_JPEG_BYTES]
-    assert fake_media_processor.calls == [(SAMPLE_JPEG_BYTES, "image/jpeg")]
+    assert fake_media_processor.calls == [(SAMPLE_JPEG_BYTES, MediaFormat.JPEG)]
 
 
 def test_upload_png_returns_image_detection_response(client: TestClient) -> None:
@@ -73,7 +99,7 @@ def test_upload_avi_returns_per_frame_detection_results(
     assert [frame["frame_index"] for frame in payload["frames"]] == [0, 8]
     assert [frame["timestamp_seconds"] for frame in payload["frames"]] == [0.0, 0.25]
     assert fake_engine.calls == [b"frame-0", b"frame-1"]
-    assert fake_media_processor.calls == [(b"video bytes", "video/x-msvideo")]
+    assert fake_media_processor.calls == [(b"video bytes", MediaFormat.AVI)]
 
 
 def test_rejects_invalid_upload_content_type(client: TestClient) -> None:

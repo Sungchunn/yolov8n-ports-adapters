@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from inference.domain.exceptions import InvalidDetection, InvalidImageError
+from inference.domain.exceptions import InvalidDetection
 from inference.domain.model import InferenceResult, MediaKind
+from inference.service_layer.errors import InvalidImageError
+from inference.service_layer.media import MediaFormat
 from inference.service_layer.ports import AbstractInferenceEngine, AbstractMediaProcessor
 
 
@@ -42,14 +44,14 @@ def detect_objects(
 
 def detect_media(
     media_bytes: bytes,
-    content_type: str,
+    media_format: MediaFormat,
     inference_engine: AbstractInferenceEngine,
     media_processor: AbstractMediaProcessor,
 ) -> MediaDetectionResult:
     if not media_bytes:
         raise InvalidImageError("media payload must not be empty")
 
-    processed_media = media_processor.process(media_bytes, content_type)
+    processed_media = media_processor.process(media_bytes, media_format)
     return MediaDetectionResult(
         kind=processed_media.kind,
         frames=tuple(

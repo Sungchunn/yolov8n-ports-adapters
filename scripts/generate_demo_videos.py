@@ -159,7 +159,7 @@ def main() -> None:
     }
 
     for file_name, vehicles in clips.items():
-        render_clip(OUT_DIR / file_name, vehicles)
+        render_clip(OUT_DIR / file_name, vehicles) # type: ignore
 
 
 if __name__ == "__main__":

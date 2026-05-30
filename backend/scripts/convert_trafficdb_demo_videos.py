@@ -11,6 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SOURCE_DIR = ROOT / "assets" / "video"
 DEFAULT_OUT_DIR = ROOT / "frontend" / "public" / "assets" / "demo" / "videos"
+DEFAULT_THUMBNAIL_DIR = (
+    ROOT / "frontend" / "public" / "assets" / "demo" / "thumbnails"
+)
 DEFAULT_MANIFEST = ROOT / "frontend" / "public" / "assets" / "demo" / "videos.json"
 DEFAULT_COUNT = 10
 DEFAULT_SEED = 20260530
@@ -40,6 +43,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_MANIFEST,
         help=f"Manifest JSON path to write. Default: {DEFAULT_MANIFEST}",
+    )
+    parser.add_argument(
+        "--thumbnail-dir",
+        type=Path,
+        default=DEFAULT_THUMBNAIL_DIR,
+        help=f"Directory for generated poster JPEG files. Default: {DEFAULT_THUMBNAIL_DIR}",
     )
     parser.add_argument(
         "--count",
@@ -105,12 +114,39 @@ def convert_to_mp4(source: Path, destination: Path) -> None:
     )
 
 
+def write_thumbnail(source: Path, destination: Path) -> None:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "fatal",
+            "-ss",
+            "0.75",
+            "-i",
+            str(source),
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=160:120",
+            "-q:v",
+            "4",
+            "-update",
+            "1",
+            str(destination),
+        ],
+        check=True,
+    )
+
+
 def build_manifest_entry(prefix: str, index: int, source: Path) -> dict[str, str]:
     demo_id = f"{prefix}-{index:02d}"
     return {
         "id": demo_id,
         "label": f"TrafficDB sample {index:02d} ({source.stem})",
         "src": f"/assets/demo/videos/{demo_id}.mp4",
+        "thumbnailSrc": f"/assets/demo/thumbnails/{demo_id}.jpg",
         "contentType": "video/mp4",
     }
 
@@ -129,18 +165,24 @@ def main() -> None:
     args = parse_args()
     source_dir = args.source_dir.resolve()
     out_dir = args.out_dir.resolve()
+    thumbnail_dir = args.thumbnail_dir.resolve()
     manifest_path = args.manifest.resolve()
 
     selected = sample_avi_files(source_dir, args.count, args.seed)
     out_dir.mkdir(parents=True, exist_ok=True)
+    thumbnail_dir.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
     manifest: list[dict[str, str]] = []
     for index, source in enumerate(selected, start=1):
         destination = out_dir / f"{args.prefix}-{index:02d}.mp4"
+        thumbnail = thumbnail_dir / f"{args.prefix}-{index:02d}.jpg"
         convert_to_mp4(source, destination)
+        write_thumbnail(destination, thumbnail)
         manifest.append(build_manifest_entry(args.prefix, index, source))
-        print(f"{source.name} -> {display_path(destination)}")
+        print(
+            f"{source.name} -> {display_path(destination)}, {display_path(thumbnail)}"
+        )
 
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {display_path(manifest_path)} with {len(manifest)} demos")

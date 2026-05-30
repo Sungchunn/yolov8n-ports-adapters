@@ -65,9 +65,9 @@ p {
 }
 
 .app-shell {
-  width: min(1480px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
-  padding: 24px;
+  padding: 32px;
 }
 
 .topbar {
@@ -118,8 +118,9 @@ p {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(340px, 0.72fr) minmax(520px, 1fr);
-  gap: 18px;
+  width: 100%;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -135,7 +136,7 @@ p {
 .results-panel {
   display: grid;
   gap: 16px;
-  padding: 18px;
+  padding: 20px;
 }
 
 .panel-heading,
@@ -153,7 +154,7 @@ p {
 
 .dropzone {
   display: grid;
-  min-height: 258px;
+  min-height: 240px;
   place-items: center;
   align-content: center;
   gap: 12px;
@@ -236,8 +237,9 @@ p {
 
 .media-preview {
   display: grid;
-  min-height: 260px;
-  max-height: 420px;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -251,9 +253,64 @@ p {
   display: block;
   width: 100%;
   height: 100%;
-  max-height: 420px;
   object-fit: contain;
   background: #11181d;
+}
+
+.media-stage > img,
+.media-stage > video,
+.media-stage > .detection-layer,
+.media-stage > .video-preview-fallback {
+  grid-area: 1 / 1;
+}
+
+.detection-layer {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.detection-box {
+  position: absolute;
+  min-width: 2px;
+  min-height: 2px;
+  border: 2px solid #ff4fa3;
+  box-shadow:
+    0 0 0 1px rgb(17 24 29 / 42%),
+    0 8px 18px rgb(17 24 29 / 24%);
+}
+
+.detection-label {
+  position: absolute;
+  left: -2px;
+  bottom: calc(100% + 2px);
+  max-width: min(220px, 60vw);
+  border-radius: 4px 4px 4px 0;
+  padding: 3px 6px;
+  overflow: hidden;
+  background: #ff4fa3;
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 1px rgb(17 24 29 / 35%);
+  white-space: nowrap;
+}
+
+.video-preview-fallback {
+  z-index: 3;
+  width: min(86%, 34rem);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgb(17 24 29 / 84%);
+  color: #f6f8fa;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.4;
+  pointer-events: none;
+  text-align: center;
 }
 
 .file-meta {
@@ -490,11 +547,19 @@ tr:last-child td {
   white-space: nowrap;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1080px) {
   .workspace {
     grid-template-columns: 1fr;
   }
 
+  .app-shell {
+    width: min(980px, 100%);
+    padding: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .sample-list,
   .metric-grid,
   .frames-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

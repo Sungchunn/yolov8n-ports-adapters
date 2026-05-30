@@ -1,6 +1,14 @@
 "use client";
 
-import { DragEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  DragEvent,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   API_BASE_URL,
   DetectionRow,
@@ -8,10 +16,12 @@ import {
   SampleMedia,
   UploadResponse,
   average,
+  fileWithInferredType,
   formatBox,
   formatBytes,
   formatNumber,
   formatPercent,
+  inferMedia,
   mostCommonLabel,
   normalizeFrames,
   rowsFromFrames,
@@ -26,7 +36,7 @@ type AnalysisState =
   | { kind: "error"; message: string };
 
 const ACCEPTED_MEDIA =
-  "image/jpeg,image/jpg,image/png,video/mp4,video/quicktime,video/x-msvideo,video/webm";
+  ".jpg,.jpeg,.png,.mp4,.mov,.avi,.webm,image/jpeg,image/jpg,image/png,video/mp4,video/quicktime,video/x-msvideo,video/webm";
 
 export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +118,7 @@ export default function Home() {
   }
 
   function selectFile(file: File) {
-    setSelectedFile(file);
+    setSelectedFile(fileWithInferredType(file));
     setStatus({ label: "Ready", state: "ready" });
     setSubtitle("Ready to analyze selected media.");
     setAnalysis({ kind: "empty" });
@@ -282,17 +292,11 @@ export default function Home() {
           </div>
 
           <div className="preview-shell" aria-live="polite">
-            <div className="media-preview">
-              {selectedFile && previewUrl ? (
-                selectedFile.type.startsWith("video/") ? (
-                  <video src={previewUrl} controls muted playsInline />
-                ) : (
-                  <img src={previewUrl} alt={`Preview of ${selectedFile.name}`} />
-                )
-              ) : (
-                <span>No media selected</span>
-              )}
-            </div>
+            <TaggedMediaPreview
+              analysis={analysis}
+              previewUrl={previewUrl}
+              selectedFile={selectedFile}
+            />
             <div className="file-meta">
               {selectedFile
                 ? `${selectedFile.name} - ${selectedFile.type || "unknown type"} - ${formatBytes(
@@ -390,6 +394,170 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+function TaggedMediaPreview({
+  analysis,
+  previewUrl,
+  selectedFile,
+}: {
+  analysis: AnalysisState;
+  previewUrl: string | null;
+  selectedFile: File | null;
+}) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [videoPreviewFailed, setVideoPreviewFailed] = useState(false);
+  const inferred = selectedFile ? inferMedia(selectedFile) : null;
+  const mediaKind = inferred?.kind ?? "unknown";
+  const overlayFrame =
+    analysis.kind === "result"
+      ? analysis.payload.kind === "video"
+        ? frameForPlaybackTime(analysis.frames, currentTime)
+        : analysis.frames[0]
+      : undefined;
+
+  useEffect(() => {
+    setCurrentTime(0);
+    setVideoPreviewFailed(false);
+  }, [previewUrl]);
+
+  if (!selectedFile || !previewUrl) {
+    return (
+      <div className="media-preview">
+        <span>No media selected</span>
+      </div>
+    );
+  }
+
+  if (mediaKind === "video") {
+    const isAvi = inferred?.extension === "avi";
+
+    return (
+      <div className="media-preview media-stage">
+        <video
+          controls
+          muted
+          playsInline
+          onError={() => setVideoPreviewFailed(true)}
+          onLoadedData={() => setVideoPreviewFailed(false)}
+          onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        >
+          <source src={previewUrl} type={selectedFile.type || inferred?.contentType} />
+          Preview is unavailable for this video format.
+        </video>
+        {videoPreviewFailed ? (
+          <div className="video-preview-fallback" role="status">
+            {isAvi
+              ? "AVI preview is not supported by this browser. Upload analysis is still available."
+              : "Preview is unavailable for this video. Upload analysis is still available."}
+          </div>
+        ) : null}
+        <DetectionOverlay frame={overlayFrame} />
+      </div>
+    );
+  }
+
+  if (mediaKind === "image") {
+    return (
+      <div className="media-preview media-stage">
+        <img src={previewUrl} alt={`Preview of ${selectedFile.name}`} />
+        <DetectionOverlay frame={overlayFrame} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="media-preview">
+      <span>Preview unavailable for this file type</span>
+    </div>
+  );
+}
+
+function DetectionOverlay({ frame }: { frame?: NormalizedFrame }) {
+  if (!frame || frame.result.detections.length === 0) {
+    return null;
+  }
+
+  const { width, height } = frame.result.image;
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return (
+    <div className="detection-layer" style={overlayLayerStyle(width, height)}>
+      {frame.result.detections.map((detection, index) => (
+        <div
+          className="detection-box"
+          key={`${frame.frameIndex}-${detection.label.class_id}-${index}`}
+          style={boxStyle(detection.box, width, height)}
+        >
+          <span className="detection-label">
+            {detection.label.name} {formatPercent(detection.confidence)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function frameForPlaybackTime(frames: NormalizedFrame[], currentTime: number) {
+  if (frames.length === 0) {
+    return undefined;
+  }
+
+  let activeFrame = frames[0];
+  for (const frame of frames) {
+    if (frame.timestamp > currentTime) {
+      break;
+    }
+    activeFrame = frame;
+  }
+  return activeFrame;
+}
+
+function overlayLayerStyle(width: number, height: number): CSSProperties {
+  const mediaRatio = width / height;
+  const stageRatio = 16 / 9;
+
+  if (mediaRatio > stageRatio) {
+    const scaledHeight = (stageRatio / mediaRatio) * 100;
+    return {
+      height: `${scaledHeight}%`,
+      left: 0,
+      top: `${(100 - scaledHeight) / 2}%`,
+      width: "100%",
+    };
+  }
+
+  const scaledWidth = (mediaRatio / stageRatio) * 100;
+  return {
+    height: "100%",
+    left: `${(100 - scaledWidth) / 2}%`,
+    top: 0,
+    width: `${scaledWidth}%`,
+  };
+}
+
+function boxStyle(
+  box: NormalizedFrame["result"]["detections"][number]["box"],
+  imageWidth: number,
+  imageHeight: number,
+): CSSProperties {
+  const left = clampPercent((box.x1 / imageWidth) * 100);
+  const top = clampPercent((box.y1 / imageHeight) * 100);
+  const right = clampPercent((box.x2 / imageWidth) * 100);
+  const bottom = clampPercent((box.y2 / imageHeight) * 100);
+
+  return {
+    height: `${Math.max(0, bottom - top)}%`,
+    left: `${left}%`,
+    top: `${top}%`,
+    width: `${Math.max(0, right - left)}%`,
+  };
+}
+
+function clampPercent(value: number) {
+  return Math.min(100, Math.max(0, value));
 }
 
 function MetricTile({ label, value }: { label: string; value: string }) {

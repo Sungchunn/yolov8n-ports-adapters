@@ -36,6 +36,9 @@ FastAPI service for object detection with a clean Ports and Adapters / Onion Arc
 - `adapters/` contains concrete infrastructure: `YoloInferenceEngine` and `OpenCvMediaProcessor` for uploaded images and videos.
 - `entrypoints/` contains FastAPI routes, request validation, DTO serialization, and exception-to-HTTP mapping.
 
+For a visual symbol-by-symbol trace of the backend package, see
+[`docs/ports-and-adapters-trace.md`](docs/ports-and-adapters-trace.md).
+
 The core ports are:
 
 ```python

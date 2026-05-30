@@ -203,6 +203,12 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
 # Ruff stuff:
 .ruff_cache/
 
@@ -227,9 +233,9 @@ __marimo__/
 .obsidian
 
 # Local datasets and third-party media downloads should not be committed.
-# Keep only original, curated demo media under assets/demo/.
+# Keep only original, curated demo media under frontend/public/assets/demo/.
 /data/
 /assets/*
-!/assets/README.md
-!/assets/demo/
-!/assets/demo/**
+!/frontend/public/assets/
+!/frontend/public/assets/demo/
+!/frontend/public/assets/demo/**

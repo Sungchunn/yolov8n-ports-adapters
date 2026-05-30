@@ -2,7 +2,7 @@
 
 > **Status:** Implemented architecture reference.
 > **Scope:** High-level architecture for a Python image/video upload inference API built on the **Ports & Adapters / Onion Architecture** described in *Architecture Patterns with Python* (Percival & Gregory — "Cosmic Python"; companion repo [`github.com/cosmicpython/code`](https://github.com/cosmicpython/code)).
-> **Stack decisions:** FastAPI entrypoint · Ultralytics YOLO (`yolov8n.pt`) · `uv` + `pyproject.toml` · `pytest` · `import-linter` + `mypy` as architectural guardrails.
+> **Stack decisions:** FastAPI backend entrypoint · Next.js frontend adapter · Ultralytics YOLO (`yolov8n.pt`) · `uv` + `pyproject.toml` · `pytest` · `import-linter` + `mypy` as architectural guardrails.
 
 This document fixes the layering, the machine-learning and media-processing **ports**, the request flow, the domain model, the testing strategy, and the scalability story.
 
@@ -63,48 +63,41 @@ The ports-and-adapters view is provided as a landscape SVG so it can be printed 
 
 ## 4. Project structure
 
-A `src`-layout single package (`inference`), mirroring the book's verified conventions: `config.py` and `bootstrap.py` at the package root, tests split into `unit` and `e2e`.
+A backend `src`-layout package (`inference`) plus a separate Next.js frontend
+adapter. The backend mirrors the book's verified conventions: `config.py` and
+`bootstrap.py` at the package root, tests split into `unit` and `integration`.
 
 ```text
 .
-├── pyproject.toml              # uv project; deps: fastapi, uvicorn, ultralytics, pydantic, pytest, import-linter, mypy
-├── Makefile                    # run / test / lint targets (book convention)
-├── .importlinter               # ARCHITECTURAL GUARDRAIL (layered + forbidden-import contracts)
+├── backend/
+│   ├── pyproject.toml          # uv project; deps: fastapi, uvicorn, ultralytics, pydantic, pytest, import-linter, mypy
+│   ├── .importlinter           # ARCHITECTURAL GUARDRAIL (forbidden-import contracts)
+│   ├── src/
+│   │   └── inference/
+│   │       ├── __init__.py
+│   │       ├── config.py       # env-driven settings
+│   │       ├── bootstrap.py    # DI: instantiate concrete adapters once, inject ports
+│   │       ├── domain/
+│   │       ├── service_layer/
+│   │       ├── adapters/
+│   │       └── entrypoints/
+│   │           ├── app.py      # FastAPI app, CORS, health, exception handlers
+│   │           ├── routes.py   # POST /v1/detect/upload controller + edge validation
+│   │           └── schemas.py  # Pydantic DTOs
+│   └── tests/
+│       ├── conftest.py
+│       ├── unit/
+│       └── integration/
+├── frontend/
+│   ├── app/
+│   └── public/assets/demo/
+├── docker-compose.yml
+├── Makefile                    # backend / frontend / check targets
 ├── models/
 │   └── yolov8n.pt              # weights (gitignored; documented download)
 ├── docs/
 │   └── architecture.md         # this document
-├── src/
-│   └── inference/
-│       ├── __init__.py
-│       ├── config.py           # env-driven settings (MODEL_PATH, MODEL_NAME, thresholds, MAX_UPLOAD_BYTES, API_VERSION)
-│       ├── bootstrap.py        # DI: instantiate concrete adapters once, inject ports
-│       ├── domain/
-│       │   ├── __init__.py
-│       │   ├── model.py        # frozen value objects: InferenceResult, Detection, ProcessedMedia, MediaFrame
-│       │   └── exceptions.py   # framework-free domain errors
-│       ├── service_layer/
-│       │   ├── __init__.py
-│       │   ├── ports.py        # AbstractInferenceEngine and AbstractMediaProcessor ports
-│       │   └── services.py     # use-case functions; depend ONLY on core ports
-│       ├── adapters/
-│       │   ├── __init__.py
-│       │   └── inference.py    # YoloInferenceEngine + tensor→domain mapping
-│       └── entrypoints/
-│           ├── __init__.py
-│           ├── app.py          # FastAPI app, lifespan model-load, exception handlers
-│           ├── routes.py       # POST /v1/detect/upload controller + edge validation
-│           └── schemas.py      # Pydantic DTOs (published API contract; isolates HTTP from domain)
-└── tests/
-    ├── conftest.py             # FakeInferenceEngine, FakeMediaProcessor, TestClient fixtures
-    ├── pytest.ini
-    ├── assets/
-    │   └── sample.jpg
-    ├── unit/
-    │   ├── test_domain.py      # value-object invariants
-    │   └── test_services.py    # detect_objects() against FakeInferenceEngine (fast, deterministic)
-    └── e2e/
-        └── test_api.py         # full POST image → JSON cycle with the real YOLO engine
+└── README.md
 ```
 
 ### Requirement → file mapping
@@ -117,9 +110,9 @@ A `src`-layout single package (`inference`), mirroring the book's verified conve
 | 4a. Immutable domain value objects | `domain/model.py` |
 | 4b. ML tensors → domain mapping | `YoloInferenceEngine` in `adapters/inference.py` |
 | 4c. Clean JSON of domain data | `entrypoints/schemas.py` + `entrypoints/routes.py` |
-| 5a. Fast unit tests with fake ports | `tests/unit/test_services.py`, `tests/conftest.py` |
-| 5b. Integration / E2E with a real image | `tests/e2e/test_api.py` |
-| AI guardrails (README §3) | this document + enforced by `.importlinter` |
+| 5a. Fast unit tests with fake ports | `backend/tests/unit/test_services.py`, `backend/tests/conftest.py` |
+| 5b. Integration tests with fake ports | `backend/tests/integration/test_api.py` |
+| AI guardrails (README §3) | this document + enforced by `backend/.importlinter` |
 
 ## 5. Key decision: where the ML port lives
 

@@ -1,7 +1,7 @@
 # Ports And Adapters Trace
 
 > Status: implementation trace.
-> Scope: production Python package under `src/inference/`.
+> Scope: production Python package under `backend/src/inference/`.
 
 This document traces the current code as a Ports and Adapters backend. It is intentionally closer to the code than `architecture.md`: every production class and function is listed, with the diagrams showing where calls cross the application boundary.
 
@@ -322,7 +322,8 @@ flowchart TB
 flowchart TB
     subgraph HTTP["entrypoints.app and entrypoints.routes"]
         Create["create_app()"]
-        Frontend["_register_frontend() / frontend_index()"]
+        Cors["CORSMiddleware"]
+        Health["_register_health_check() / health_check()"]
         Handlers["_register_exception_handlers()"]
         Router["create_router()"]
         Upload["detect_upload()"]
@@ -332,7 +333,8 @@ flowchart TB
     end
 
     Create --> Router
-    Create --> Frontend
+    Create --> Cors
+    Create --> Health
     Create --> Handlers
     Router --> Upload
     Upload --> Read
@@ -344,10 +346,10 @@ flowchart TB
 
 | Entrypoint symbol | Interaction |
 | --- | --- |
-| `create_app()` | Builds the FastAPI app, resolves settings, wires lifespan startup, optionally installs test doubles, includes routes, static frontend, and exception handlers. |
+| `create_app()` | Builds the FastAPI app, resolves settings, wires lifespan startup, optionally installs test doubles, includes routes, CORS, health check, and exception handlers. |
 | `lifespan()` | Inner async context manager in `create_app()` that calls `bootstrap()` when real dependencies are needed. |
-| `_register_frontend()` | Mounts `/assets` and `/static`, and registers the root HTML route. |
-| `frontend_index()` | Inner route function returning `entrypoints/static/index.html`. |
+| `_register_health_check()` | Registers the backend health route used by Docker and local checks. |
+| `health_check()` | Inner route function returning `{"status": "ok"}`. |
 | `_register_exception_handlers()` | Registers domain/application exception mappings at the HTTP edge. |
 | `invalid_image_handler()` | Inner handler mapping `InvalidImageError` to 422. |
 | `invalid_video_handler()` | Inner handler mapping `InvalidVideoError` to 422. |

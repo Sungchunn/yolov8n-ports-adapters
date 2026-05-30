@@ -10,5 +10,5 @@ demo videos there instead of relying on filesystem directory listing.
 Regenerate the clips with:
 
 ```bash
-python3 scripts/generate_demo_videos.py
+python3 backend/scripts/generate_demo_videos.py
 ```

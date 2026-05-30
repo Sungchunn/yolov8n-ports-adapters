@@ -129,7 +129,7 @@ lives in `adapters/inference.py`, imports the core port, and maps raw YOLO outpu
 **Guardrail:** an `import-linter` contract forbids `domain` and `service_layer` from importing `torch`, `ultralytics`, `fastapi`, or anything under `inference.adapters` (see
 [§11](#11-architectural-guardrails-anti-vibe-coding)). The boundary is enforced by CI.
 
-The same rule applies to uploaded media processing. `AbstractMediaProcessor` also lives in `service_layer/ports.py`; the service states that it needs media bytes and a content type converted into inference-ready `MediaFrame` objects. `OpenCvMediaProcessor` lives in `adapters/media.py`, validates JPEG/PNG payloads, samples uploaded videos including AVI files, and returns framework-free `ProcessedMedia`. The route never imports OpenCV helpers, and the service never knows which library decoded or sampled the upload.
+The same rule applies to uploaded media processing. `AbstractMediaProcessor` also lives in `service_layer/ports.py`; the service states that it needs media bytes and a core-owned `MediaFormat` converted into inference-ready `MediaFrame` objects. `OpenCvMediaProcessor` lives in `adapters/media.py`, validates JPEG/PNG payloads, samples uploaded videos including AVI files, and returns framework-free `ProcessedMedia`. The route translates HTTP content types into `MediaFormat`, never imports OpenCV helpers, and the service never knows which library decoded or sampled the upload.
 
 ## 6. Domain model
 
@@ -176,7 +176,7 @@ classDiagram
 - **`InferenceResult`** — aggregate for one inference call: `detections: tuple[Detection,...]` (a tuple, so the result is immutable and hashable) plus image metadata (`image_width`, `image_height`), `inference_ms`, `model_name` (e.g. `"yolov8n"`), and `created_at`. Convenience `count()` / `__len__`.
 - **`MediaKind`, `MediaFrame`, `ProcessedMedia`** — framework-free upload-processing value objects. A media processor adapter converts a single uploaded file into one image frame or many sampled video frames before inference.
 
-`domain/exceptions.py` defines a pure hierarchy including `InvalidImageError`, `InvalidVideoError`, `UnsupportedMediaTypeError`, `InvalidBoundingBox`, and `InferenceError`. None of these know anything about HTTP.
+`domain/exceptions.py` defines pure domain invariant errors such as `InvalidBoundingBox` and `InvalidDetection`. Application/runtime errors such as invalid media payloads, unsupported media formats, and inference failures live in `service_layer/errors.py`. None of these know anything about HTTP.
 
 ## 7. Request flow
 
@@ -188,23 +188,23 @@ Step by step, with the responsible module:
 
 1. **Ingress** — `entrypoints/routes.py`: `POST /v1/detect/upload`, `file: UploadFile = File(...)`
    for `multipart/form-data`. FastAPI handles multipart parsing.
-2. **Edge / structural validation** — `routes.py` reads the upload, rejects empty payloads, and enforces `MAX_UPLOAD_BYTES`. Media type interpretation is delegated through the core media port.
-3. **Service call** — `routes.py` calls `service_layer.services.detect_media(media_bytes, content_type, inference_engine, media_processor)`, where both ports are injected singletons resolved at startup (see [§8](#8-dependency-injection--bootstrap)).
-4. **Media processing** — `services.py` invokes `AbstractMediaProcessor.process(...) -> ProcessedMedia`. `OpenCvMediaProcessor` validates JPEG/PNG payloads or samples uploaded videos into image frames.
+2. **Edge / structural validation** — `routes.py` reads the upload, rejects empty payloads, enforces `MAX_UPLOAD_BYTES`, and translates the HTTP content type into a core-owned `MediaFormat`.
+3. **Service call** — `routes.py` calls `service_layer.services.detect_media(media_bytes, media_format, inference_engine, media_processor)`, where both ports are injected singletons resolved at startup (see [§8](#8-dependency-injection--bootstrap)).
+4. **Media processing** — `services.py` invokes `AbstractMediaProcessor.process(...) -> ProcessedMedia`. `OpenCvMediaProcessor` validates JPEG/PNG payloads or samples uploaded videos into image frames based on the core media format.
 5. **Use-case coordination** — `services.py` runs each `MediaFrame.image_bytes` through `AbstractInferenceEngine.predict(...)`. Imports only `domain` and `service_layer.ports`.
 6. **Inference + mapping** — `adapters/inference.py` (`YoloInferenceEngine.predict`): the *only* place `ultralytics`/`torch` is imported. Decodes the image, runs the network,
    maps raw tensors (`results[0].boxes.xyxy/.conf/.cls`, `names`) into immutable value objects. Raw tensors never leave this module.
 7. **Serialization** — `routes.py` + `entrypoints/schemas.py`: map the media detection result to an image or video upload response; FastAPI serializes it to JSON. The DTO
    is the *published contract*, deliberately decoupled from the domain VO.
 
-**Exception → HTTP mapping** is centralized at the entrypoint (`@app.exception_handler(...)` in `entrypoints/app.py`). Domain code raises plain Python exceptions; only the edge knows status codes:
+**Exception → HTTP mapping** is centralized at the entrypoint (`@app.exception_handler(...)` in `entrypoints/app.py`). Domain and application code raise plain Python exceptions; only the edge knows status codes:
 
 | Condition | Raised in | HTTP status |
 | --- | --- | --- |
-| Bad/missing content-type | media adapter → surfaced as domain error | `415 Unsupported Media Type` |
+| Bad/missing content-type | HTTP entrypoint → application error | `415 Unsupported Media Type` |
 | Empty / oversize body | edge validation | `400` / `413 Payload Too Large` |
-| Undecodable / corrupt image (`InvalidImageError`) | adapter → surfaced as domain error | `422 Unprocessable Entity` |
-| Undecodable / corrupt video (`InvalidVideoError`) | adapter → surfaced as domain error | `422 Unprocessable Entity` |
+| Undecodable / corrupt image (`InvalidImageError`) | adapter → application error | `422 Unprocessable Entity` |
+| Undecodable / corrupt video (`InvalidVideoError`) | adapter → application error | `422 Unprocessable Entity` |
 | Model/runtime failure (`InferenceError`) | adapter | `503 Service Unavailable` |
 | Anything else | — | `500 Internal Server Error` |
 
@@ -301,8 +301,8 @@ AI assistants love shortcuts — importing `torch` into the domain, returning ra
   [importlinter]
   root_package = inference
 
-  [importlinter:contract:layers]
-  name = Onion layering
+  [importlinter:contract:onion_layers]
+  name = Onion dependency direction
   type = layers
   layers =
       inference.entrypoints
@@ -310,17 +310,29 @@ AI assistants love shortcuts — importing `torch` into the domain, returning ra
       inference.service_layer
       inference.domain
 
-  [importlinter:contract:domain-purity]
-  name = Domain/service free of ML & web frameworks
+  [importlinter:contract:service_depends_only_inward]
+  name = Service layer depends only on domain and ports
   type = forbidden
   source_modules =
-      inference.domain
       inference.service_layer
   forbidden_modules =
-      torch
-      ultralytics
-      fastapi
       inference.adapters
+      inference.entrypoints
+      fastapi
+      pydantic
+      cv2
+      ultralytics
+      torch
+
+  [importlinter:contract:adapters_do_not_depend_on_entrypoints]
+  name = Adapters must not depend on web entrypoints
+  type = forbidden
+  source_modules =
+      inference.adapters
+  forbidden_modules =
+      inference.entrypoints
+      fastapi
+      pydantic
   ```
 
 - **`mypy` + ABC** — `AbstractInferenceEngine(abc.ABC)` with an `@abc.abstractmethod predict(...) -> InferenceResult`; the typed service parameter (`engine: AbstractInferenceEngine`) makes the dependency-on-abstraction explicit.

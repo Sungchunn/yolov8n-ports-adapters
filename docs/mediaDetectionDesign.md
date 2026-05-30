@@ -11,8 +11,8 @@ for media processing. Concrete image/video parsing, `OpenCV` usage, and upload M
 - Keep `AbstractInferenceEngine` in `service_layer/ports.py`:
   `predict(image_bytes: bytes) -> InferenceResult`
 
-- Add `AbstractMediaProcessor` in `service_layer/ports.py`:
-  `process(media_bytes: bytes, content_type: str) -> ProcessedMedia`
+- Add `MediaFormat` and `AbstractMediaProcessor` in the service layer:
+  `process(media_bytes: bytes, media_format: MediaFormat) -> ProcessedMedia`
 
 - Add framework-free media value objects, preferably in `domain/model.py` or a small domain media module:
   - `MediaKind`: enum with `image` and `video`
@@ -20,7 +20,7 @@ for media processing. Concrete image/video parsing, `OpenCV` usage, and upload M
   - `ProcessedMedia`: immutable collection of frames and media kind
 
 - The service layer coordinates both ports:
-  - Media bytes enter the service.
+  - Media bytes and a core-owned media format enter the service.
   - The service asks `AbstractMediaProcessor` for inference-ready frames.
   - The service runs each frame through `AbstractInferenceEngine`.
   - The service returns an image or video detection result for serialization.
@@ -68,7 +68,7 @@ for media processing. Concrete image/video parsing, `OpenCV` usage, and upload M
   - Preserve test injection for fake inference and fake media processor.
 
 - Update `entrypoints/routes.py`:
-  - Keep route code thin: read upload, enforce size limit, call the service, serialize the response.
+  - Keep route code thin: read upload, enforce size limit, translate HTTP content type to `MediaFormat`, call the service, serialize the response.
   - Do not import `OpenCV`-specific logic into the route.
 
 - Update `adapters/media.py`:

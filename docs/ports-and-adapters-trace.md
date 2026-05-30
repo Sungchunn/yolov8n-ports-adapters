@@ -99,8 +99,8 @@ sequenceDiagram
     Route->>Read: read at most max_upload_bytes + 1
     Read-->>Route: media bytes or HTTPException
     Route->>State: fetch inference_engine and media_processor
-    Route->>Service: media_bytes, content_type, ports
-    Service->>MediaPort: process(media_bytes, content_type)
+    Route->>Service: media_bytes, media_format, ports
+    Service->>MediaPort: process(media_bytes, media_format)
     MediaPort-->>Service: ProcessedMedia(kind, frames)
     loop each MediaFrame
         Service->>InferencePort: predict(frame.image_bytes)
@@ -117,19 +117,20 @@ sequenceDiagram
 ```mermaid
 classDiagram
     class DomainError
+    class InvalidBoundingBox
+    class InvalidDetection
+    class ApplicationError
     class InvalidImageError
     class InvalidVideoError
     class UnsupportedMediaTypeError
-    class InvalidBoundingBox
-    class InvalidDetection
     class InferenceError
 
-    DomainError <|-- InvalidImageError
-    DomainError <|-- InvalidVideoError
-    DomainError <|-- UnsupportedMediaTypeError
     DomainError <|-- InvalidBoundingBox
     DomainError <|-- InvalidDetection
-    DomainError <|-- InferenceError
+    ApplicationError <|-- InvalidImageError
+    ApplicationError <|-- InvalidVideoError
+    ApplicationError <|-- UnsupportedMediaTypeError
+    ApplicationError <|-- InferenceError
 
     class BoundingBox {
         +float x1
@@ -187,7 +188,7 @@ classDiagram
     }
     class AbstractMediaProcessor {
         <<port>>
-        +process(media_bytes, content_type) ProcessedMedia
+        +process(media_bytes, media_format) ProcessedMedia
     }
     class DetectionFrameResult {
         +int frame_index
@@ -215,10 +216,11 @@ classDiagram
 
 | Symbol | Interaction |
 | --- | --- |
-| `DomainError` | Base class caught by FastAPI exception handlers as a fallback domain/application failure. |
-| `InvalidImageError` | Raised by edge/service/adapter code when an image payload is empty or undecodable; mapped to HTTP 422 except route-level empty upload, which is HTTP 400. |
+| `DomainError` | Base class caught by FastAPI exception handlers as a fallback domain failure. |
+| `ApplicationError` | Base class for framework-free application/runtime failures. |
+| `InvalidImageError` | Raised by service/adapter code when an image payload is empty or undecodable; mapped to HTTP 422 except route-level empty upload, which is HTTP 400. |
 | `InvalidVideoError` | Raised by media sampling/encoding failures; mapped to HTTP 422. |
-| `UnsupportedMediaTypeError` | Raised by `OpenCvMediaProcessor` for unsupported content types; mapped to HTTP 415. |
+| `UnsupportedMediaTypeError` | Raised by the HTTP entrypoint for unsupported content types or defensively by `OpenCvMediaProcessor` for unsupported media formats; mapped to HTTP 415. |
 | `InvalidBoundingBox` | Raised by `BoundingBox.__post_init__()` for invalid coordinates. |
 | `InvalidDetection` | Raised by value objects and service result objects for invariant violations. |
 | `InferenceError` | Raised by `YoloInferenceEngine` or media import code for runtime dependency/model failures; mapped to HTTP 503. |
@@ -238,7 +240,7 @@ classDiagram
 | `ProcessedMedia` | Domain aggregate returned by `AbstractMediaProcessor.process()`. |
 | `ProcessedMedia.__post_init__()` | Enforces image/video frame-count and sample-interval rules. |
 | `AbstractInferenceEngine.predict()` | Driven port for one-frame inference. Implemented by `YoloInferenceEngine`, faked by tests. |
-| `AbstractMediaProcessor.process()` | Driven port for converting an upload into inference-ready frames. Implemented by `OpenCvMediaProcessor`, faked by tests. |
+| `AbstractMediaProcessor.process()` | Driven port for converting upload bytes plus a core-owned `MediaFormat` into inference-ready frames. Implemented by `OpenCvMediaProcessor`, faked by tests. |
 | `DetectionFrameResult` | Service-layer wrapper preserving frame metadata beside an `InferenceResult`. |
 | `MediaDetectionResult` | Service-layer result returned to the HTTP adapter after all frames have been inferred. |
 | `MediaDetectionResult.__post_init__()` | Enforces result-frame and video sample-interval rules. |
@@ -273,8 +275,8 @@ flowchart TB
 
 | `adapters.media` symbol | Interaction |
 | --- | --- |
-| `IMAGE_CONTENT_TYPES` | Content-type set used by `OpenCvMediaProcessor.process()` for image dispatch. |
-| `VIDEO_CONTENT_TYPES` | Content-type-to-temp-file-suffix map used by `OpenCvMediaProcessor.process()` for video dispatch. |
+| `IMAGE_FORMATS` | Core media-format set used by `OpenCvMediaProcessor.process()` for image dispatch. |
+| `VIDEO_SUFFIXES` | Core media-format-to-temp-file-suffix map used by `OpenCvMediaProcessor.process()` for video dispatch. |
 | `CaptureLike` | Protocol describing the subset of `cv2.VideoCapture` needed by `sample_video_capture()` and tests. |
 | `EncodedImageLike` | Protocol for OpenCV encoded image buffers returned by `cv2.imencode()`. |
 | `Cv2Like` | Protocol for the small OpenCV surface used by this adapter. |
@@ -282,7 +284,7 @@ flowchart TB
 | `_load_cv2()` | Lazily imports OpenCV and converts missing optional dependencies into `InferenceError`. |
 | `OpenCvMediaProcessor` | Concrete implementation of `AbstractMediaProcessor`. |
 | `OpenCvMediaProcessor.__init__()` | Stores video sampling interval and max-frame cap from `Settings`. |
-| `OpenCvMediaProcessor.process()` | Dispatches by content type; returns image `ProcessedMedia`, video `ProcessedMedia`, or raises `UnsupportedMediaTypeError`. |
+| `OpenCvMediaProcessor.process()` | Dispatches by `MediaFormat`; returns image `ProcessedMedia`, video `ProcessedMedia`, or raises `UnsupportedMediaTypeError`. |
 | `OpenCvMediaProcessor._validate_image()` | Checks JPEG/PNG magic bytes before image bytes reach inference. |
 | `open_capture()` | Opens a video source through OpenCV. |
 | `encode_frame_to_jpeg()` | Converts sampled raw frames to JPEG bytes for the inference port. |

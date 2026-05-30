@@ -32,7 +32,7 @@ renders image and sampled-video detection results.
 
 ## Docker
 
-Place YOLO weights at `models/yolov8n.pt`, then run:
+Place YOLOv8n weights at `models/yolov8n.pt`, then run:
 
 ```bash
 docker compose up --build
@@ -151,7 +151,9 @@ The backend test suite uses fake `AbstractInferenceEngine` and
 ## Demo Assets
 
 Bundled demo clips live in `frontend/public/assets/demo/`. Generate the frontend
-sample library from local TrafficDB AVI files with:
+sample library from local AVI files sourced from the Kaggle
+[Highway Traffic Videos Dataset](https://www.kaggle.com/datasets/aryashah2k/highway-traffic-videos-dataset?resource=download)
+with:
 
 ```bash
 python3 backend/scripts/convert_trafficdb_demo_videos.py
@@ -160,3 +162,11 @@ python3 backend/scripts/convert_trafficdb_demo_videos.py
 The script randomly samples 10 files from `assets/video/`, converts them to MP4
 under `frontend/public/assets/demo/videos/`, and rewrites
 `frontend/public/assets/demo/videos.json`.
+
+## Sources
+
+- Demo video data: Kaggle
+  [Highway Traffic Videos Dataset](https://www.kaggle.com/datasets/aryashah2k/highway-traffic-videos-dataset?resource=download).
+- Vision model: Ultralytics
+  [YOLOv8 overview](https://docs.ultralytics.com/models/yolov8#overview),
+  using the `yolov8n.pt` detection model.
